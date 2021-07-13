@@ -6,7 +6,6 @@ import React, {
   useEffect,
 } from 'react'
 import Image from '../atoms/Image'
-import Icon from '../atoms/Icon'
 import {
   mdiAccountPlus,
   mdiHistory,
@@ -14,24 +13,24 @@ import {
   mdiAccountGroup,
   mdiClose,
   mdiTransitConnectionVariant,
-  mdiAccountArrowLeft,
   mdiLinkPlus,
   mdiConnection,
 } from '@mdi/js'
-import styled from '../../lib/styled'
-import {
-  flexCenter,
-  border,
-  closeIconColor,
-} from '../../lib/styled/styleFunctions'
 import { openNew } from '../../lib/platform'
 import { boostHubLearnMorePageUrl } from '../../lib/boosthub'
 import cc from 'classcat'
-import { FormPrimaryButton, FormSecondaryButton } from '../atoms/form'
 import { usePreferences } from '../../lib/preferences'
 import { useRouter } from '../../lib/router'
 import { useCloudIntroModal } from '../../lib/cloudIntroModal'
 import { useGeneralStatus } from '../../lib/generalStatus'
+import styled from '../../shared/lib/styled'
+import {
+  closeIconColor,
+  border,
+  flexCenter,
+} from '../../shared/lib/styled/styleFunctions'
+import Icon from '../../shared/components/atoms/Icon'
+import Button from '../../shared/components/atoms/Button'
 
 const CloudIntroModal = () => {
   const { preferences, openTab } = usePreferences()
@@ -52,7 +51,8 @@ const CloudIntroModal = () => {
     } else {
       push('/app/boosthub/teams')
     }
-  }, [userInfo, push])
+    toggleShowingCloudIntroModal()
+  }, [userInfo, push, toggleShowingCloudIntroModal])
 
   const [
     showingDisabledMigrationTooltip,
@@ -98,9 +98,13 @@ const CloudIntroModal = () => {
         </CloseButton>
         <div className='content'>
           <h1 className='title'>Introducing Cloud Space</h1>
+          <h4 className='title'>
+            Migrate data to Cloud space and earn a 1 month coupon!
+          </h4>
           <div className='switch'>
             <div className='switch__group'>
-              <button
+              <Button
+                variant={'icon-secondary'}
                 className={cc([
                   'switch__button',
                   activeTab === 'team' && 'active',
@@ -108,11 +112,12 @@ const CloudIntroModal = () => {
                 onClick={() => {
                   setActiveTab('team')
                 }}
+                iconPath={mdiAccountGroup}
+                iconSize={20}
               >
-                <Icon className='switch__button__icon' path={mdiAccountGroup} />
                 With My Team
-              </button>
-              <button
+              </Button>
+              <Button
                 className={cc([
                   'switch__button',
                   activeTab === 'personal' && 'active',
@@ -120,10 +125,11 @@ const CloudIntroModal = () => {
                 onClick={() => {
                   setActiveTab('personal')
                 }}
+                iconPath={mdiAccount}
+                iconSize={20}
               >
-                <Icon className='switch__button__icon' path={mdiAccount} />
                 For Myself
-              </button>
+              </Button>
             </div>
           </div>
           <IntroContainer>
@@ -138,18 +144,6 @@ const CloudIntroModal = () => {
                     <p>
                       You can edit markdown documents with your colleagues
                       synchronously
-                    </p>
-                  </div>
-                </li>
-                <li className='featureListItem'>
-                  <div className='featureListItemIcon'>
-                    <Icon path={mdiAccountArrowLeft} />
-                  </div>
-                  <div className='featureListItemBody'>
-                    <h2>Guest Invitation</h2>
-                    <p>
-                      Invite guests to specific documents. You can collaborate
-                      with your customers, your friends and so on.
                     </p>
                   </div>
                 </li>
@@ -214,16 +208,20 @@ const CloudIntroModal = () => {
               </ul>
             )}
             <div className='screenShot'>
-              <Image src='/app/static/boosthub.png' />
+              <Image src='/app/static/img_ui_no-annotation.jpg' />
             </div>
           </IntroContainer>
           <div className='form-group'>
-            {cloudSpaces.length === 0 && (
-              <FormPrimaryButton onClick={navigateToCreateSpacePageOrLogIn}>
+            {cloudSpaces.length !== 0 && (
+              <Button
+                variant={'primary'}
+                onClick={navigateToCreateSpacePageOrLogIn}
+              >
                 Get Started
-              </FormPrimaryButton>
+              </Button>
             )}
-            <FormSecondaryButton
+            <Button
+              variant={'secondary'}
               className={cc([userInfo == null && 'disabled'])}
               onClick={() => {
                 openTab('migration')
@@ -233,7 +231,7 @@ const CloudIntroModal = () => {
               onMouseLeave={hideDisabledMigrationTooltip}
             >
               Migrate this local space to your cloud space
-            </FormSecondaryButton>
+            </Button>
           </div>
           <div className='disabled-tooltip'>
             {userInfo == null && showingDisabledMigrationTooltip && (
@@ -250,17 +248,16 @@ const CloudIntroModal = () => {
 export default CloudIntroModal
 
 const Container = styled.div`
-  background-color: ${({ theme }) => theme.backgroundColor};
+  background-color: ${({ theme }) => theme.colors.background.primary};
   height: 100%;
   position: fixed;
   top: 0;
-  left: 68px;
+  left: 0px;
   bottom: 0;
   right: 0;
   z-index: 10000;
   display: flex;
   align-items: center;
-  height: 100%;
 
   .content {
     justify-content: center;
@@ -279,19 +276,19 @@ const Container = styled.div`
     margin-bottom: 15px;
     .switch__group {
       border-radius: 4px;
-      background-color: ${({ theme }) => theme.navItemHoverBackgroundColor};
-      padding: 5px 5px;
+      background-color: ${({ theme }) => theme.colors.background.quaternary};
+      padding: 3px 3px;
     }
     .switch__button {
       width: 160px;
       background-color: transparent;
       border: none;
       cursor: pointer;
-      color: ${({ theme }) => theme.navItemColor};
+      color: ${({ theme }) => theme.colors.text.secondary};
       padding: 5px 10px;
       border-radius: 4px;
       &.active {
-        background-color: ${({ theme }) => theme.navItemActiveBackgroundColor};
+        background-color: ${({ theme }) => theme.colors.background.tertiary};
       }
     }
     .switch__button__icon {
@@ -311,8 +308,8 @@ const Container = styled.div`
     height: 30px;
   }
   .disabled-tooltip__content {
-    color: ${({ theme }) => theme.tooltipTextColor};
-    background-color: ${({ theme }) => theme.tooltipBackgroundColor};
+    color: ${({ theme }) => theme.colors.text.primary};
+    background-color: ${({ theme }) => theme.colors.background.primary};
     padding: 5px;
     border-radius: 4px;
     margin: 0;
@@ -339,50 +336,56 @@ const IntroContainer = styled.div`
   .featureList {
     list-style: none;
     width: 300px;
-    margin: 0;
-    margin-right: 20px;
+    margin: 0 20px 0 0;
     padding: 0;
     & > .featureLearnMoreItem {
       text-align: right;
-      color: ${({ theme }) => theme.primaryColor};
+      color: ${({ theme }) => theme.colors.text.primary};
       cursor: pointer;
+
       &:hover {
         text-decoration: underline;
       }
     }
   }
+
   .featureList > .featureListItem {
-    ${border}
+    ${border};
     display: flex;
-    padding: 0 5px;
     margin-bottom: 20px;
     border-radius: 5px;
     padding: 10px 5px 10px 10px;
-    background-color: ${({ theme }) => theme.navItemBackgroundColor};
+    background-color: ${({ theme }) => theme.colors.background.secondary};
+
     & > .featureListItemIcon {
-      ${flexCenter}
+      ${flexCenter};
       font-size: 24px;
       width: 24px;
       height: 24px;
     }
+
     & > .featureListItemBody {
       margin-left: 7px;
+
       & > h2 {
         font-size: 18px;
         margin-top: 0;
         margin-bottom: 10px;
       }
+
       & > p {
         font-size: 14px;
         margin: 0;
       }
     }
   }
+
   .screenShot {
     flex: 1;
+
     img {
       width: 100%;
-      ${border}
+      ${border};
       border-radius: 5px;
     }
   }

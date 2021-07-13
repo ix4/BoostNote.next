@@ -6,7 +6,7 @@ import {
   usingElectron,
   sendToHost,
   useElectron,
-  usingLegacyElectron,
+  globalContextMenuIsConfigured,
 } from '../lib/stores/electron'
 import { GlobalDataProvider } from '../lib/stores/globalData'
 import { useEffectOnce } from 'react-use'
@@ -14,16 +14,14 @@ import { gaTrackingId, nodeEnv, boostHubBaseUrl } from '../lib/consts'
 import '../lib/i18n'
 
 import { RealtimeConnProvider } from '../lib/stores/realtimeConn'
-import { V2ToastProvider } from '../../lib/v2/stores/toast'
+import { V2ToastProvider } from '../../shared/lib/stores/toast'
 const App = () => {
   useElectron()
   const [accessTokenInitialized, setAccessTokenInitialized] = useState(false)
 
   useEffectOnce(() => {
     ;(async () => {
-      if (nodeEnv !== 'production' || !usingLegacyElectron) {
-        await initAccessToken()
-      }
+      await initAccessToken()
       setAccessTokenInitialized(true)
     })()
   })
@@ -32,8 +30,12 @@ const App = () => {
     if (!usingElectron) {
       return
     }
+    if (globalContextMenuIsConfigured) {
+      return
+    }
     const handler = (event: MouseEvent) => {
       event.preventDefault()
+      event.stopPropagation()
       sendToHost('open-context-menu')
     }
     window.addEventListener('contextmenu', handler)
@@ -48,6 +50,9 @@ const App = () => {
   }
   return (
     <>
+      <link href='/app/katex/katex.min.css' rel='stylesheet' />
+      <link href='/app/remark-admonitions/classic.css' rel='stylesheet' />
+
       <V2ToastProvider>
         <GlobalDataProvider>
           <RealtimeConnProvider>
@@ -72,6 +77,7 @@ const App = () => {
                 ga('send', 'pageview');`,
         }}
       />
+
       {nodeEnv === 'production' && (
         <script
           type='text/javascript'

@@ -2,14 +2,19 @@ import React, { useState, useCallback } from 'react'
 import {
   SectionIntroduction,
   SectionFlexRow,
-  SectionFlexDualButtons,
 } from '../../organisms/settings/styled'
-import CustomButton from '../../atoms/buttons/CustomButton'
 import { SerializedSubscription } from '../../../interfaces/db/subscription'
-import { StyledBillingInput } from '.'
-import { Spinner } from '../../atoms/Spinner'
 import { updateSubEmail } from '../../../api/teams/subscription/update'
-import { useToast } from '../../../../lib/v2/stores/toast'
+import { useToast } from '../../../../shared/lib/stores/toast'
+import Button, {
+  LoadingButton,
+} from '../../../../shared/components/atoms/Button'
+import ButtonGroup from '../../../../shared/components/atoms/ButtonGroup'
+import FormRow from '../../../../shared/components/molecules/Form/templates/FormRow'
+import Form from '../../../../shared/components/molecules/Form'
+import styled from '../../../../shared/lib/styled'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
 
 interface UpdateBillingEmailFormProps {
   sub?: SerializedSubscription
@@ -25,6 +30,7 @@ const UpdateBillingEmailForm = ({
   const { pushApiErrorMessage } = useToast()
   const [sending, setSending] = useState<boolean>(false)
   const [email, setEmail] = useState<string>(sub != null ? sub.email : '')
+  const { translate } = useI18n()
 
   const onSubmit = async (event: any) => {
     event.preventDefault()
@@ -54,52 +60,62 @@ const UpdateBillingEmailForm = ({
       <div>
         <SectionIntroduction>
           <p>You need to have a valid subscription to perform this action.</p>
-          <SectionFlexDualButtons>
-            <CustomButton
-              onClick={onCancel}
-              variant='secondary'
-              disabled={sending}
-            >
-              Cancel
-            </CustomButton>
-          </SectionFlexDualButtons>
+          <Button onClick={onCancel} variant='secondary' disabled={sending}>
+            Cancel
+          </Button>
         </SectionIntroduction>
       </div>
     )
   }
 
   return (
-    <div>
-      <SectionIntroduction>
-        <p>Update your billing email</p>
-        <SectionFlexRow>
-          <label>Current Email</label>
-          <span className='value'>{sub.email}</span>
-        </SectionFlexRow>
+    <Container>
+      <p>{translate(lngKeys.BillingUpdateEmail)}</p>
+      <SectionFlexRow>
+        <label>{translate(lngKeys.BillingCurrentEmail)}</label>
+        <span className='value'>{sub.email}</span>
+      </SectionFlexRow>
 
-        <StyledBillingInput
-          style={{ marginTop: 0 }}
-          placeholder='Billing Email'
-          value={email}
-          onChange={onEmailInputChangeHandler}
+      <Form onSubmit={onSubmit} rows={[]}>
+        <FormRow
+          row={{
+            items: [
+              {
+                type: 'input',
+                props: {
+                  placeholder: 'Billing Email',
+                  value: email,
+                  onChange: onEmailInputChangeHandler,
+                },
+              },
+            ],
+          }}
         />
+        <ButtonGroup display='flex' layout='spread' className='button__group'>
+          <Button onClick={onCancel} variant='secondary' disabled={sending}>
+            {translate(lngKeys.GeneralCancel)}
+          </Button>
 
-        <SectionFlexDualButtons>
-          <CustomButton
-            onClick={onCancel}
-            variant='secondary'
+          <LoadingButton
+            type='submit'
+            variant='primary'
             disabled={sending}
+            spinning={sending}
           >
-            Cancel
-          </CustomButton>
-
-          <CustomButton onClick={onSubmit} variant='primary' disabled={sending}>
-            {sending ? <Spinner /> : 'Update'}
-          </CustomButton>
-        </SectionFlexDualButtons>
-      </SectionIntroduction>
-    </div>
+            {translate(lngKeys.GeneralUpdateVerb)}
+          </LoadingButton>
+        </ButtonGroup>
+      </Form>
+    </Container>
   )
 }
+
+const Container = styled.div`
+  width: 100%;
+
+  .button__group {
+    margin-top: ${({ theme }) => theme.sizes.spaces.md}px;
+  }
+`
 
 export default UpdateBillingEmailForm

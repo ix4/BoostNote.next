@@ -1,6 +1,6 @@
 import React, { MouseEventHandler, FC } from 'react'
-import styled from '../../lib/styled'
-import { flexCenter, borderLeft } from '../../lib/styled/styleFunctions'
+import styled from '../../shared/lib/styled'
+import { borderLeft, flexCenter } from '../../shared/lib/styled/styleFunctions'
 
 interface BottomBarButtonProps {
   className?: string
@@ -24,13 +24,13 @@ export default BottomBarButton
 const Container = styled.button`
   background-color: transparent;
   border: none;
-  color: ${({ theme }) => theme.uiTextColor};
+  color: ${({ theme }) => theme.colors.text.primary};
   font-size: 14px;
-  ${flexCenter}
+  ${flexCenter};
   padding: 0 5px;
-  ${borderLeft}
+  ${borderLeft};
   cursor: pointer;
   &:hover {
-    background-color: ${({ theme }) => theme.navItemHoverBackgroundColor};
+    background-color: ${({ theme }) => theme.colors.background.secondary};
   }
 `

@@ -1,85 +1,50 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback } from 'react'
 import styled from '../../../lib/styled'
-import {
-  Section,
-  TabHeader,
-  Column,
-  Container,
-  Scrollable,
-  SectionSubtleText,
-  SectionHeader2,
-} from './styled'
-import CustomButton from '../../atoms/buttons/CustomButton'
-import ServiceConnect from '../../atoms/ServiceConnect'
-import Spinner from '../../atoms/CustomSpinner'
-import {
-  useServiceConnections,
-  withServiceConnections,
-} from '../../../lib/stores/serviceConnections'
 import { trackEvent } from '../../../api/track'
 import { MixpanelActionTrackTypes } from '../../../interfaces/analytics/mixpanel'
-import FeedbackModal from '../Modal/contents/FeedbackModal'
-import { useModal } from '../../../lib/stores/modal'
-import { githubOauthId, boostHubBaseUrl } from '../../../lib/consts'
-import { usingElectron } from '../../../lib/stores/electron'
-import Button from '../../atoms/Button'
-import { openNew } from '../../../lib/utils/platform'
-import { usePage } from '../../../lib/stores/pageStore'
+import SettingTabContent from '../../../../shared/components/organisms/Settings/atoms/SettingTabContent'
+import Button from '../../../../shared/components/atoms/Button'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
 
 const IntegrationsTab = () => {
-  const { openModal } = useModal()
-  const connectionState = useServiceConnections()
-  const { team } = usePage()
-
-  const githubConnection = useMemo(() => {
-    return connectionState.type !== 'initialising'
-      ? connectionState.connections.find((conn) => conn.service === 'github')
-      : null
-  }, [connectionState])
-
-  const removeGithubConnection = useCallback(() => {
-    if (connectionState.type !== 'initialising' && githubConnection != null) {
-      connectionState.actions.removeConnection(githubConnection)
-    }
-  }, [githubConnection, connectionState])
+  const { translate } = useI18n()
 
   const onIntegrationLinkClick = useCallback((target: string) => {
     return trackEvent(MixpanelActionTrackTypes.ZapierLinkOpen, { target })
   }, [])
 
   return (
-    <Column>
-      <Scrollable>
-        <Container>
-          <Section>
-            <TabHeader>Integrations</TabHeader>
-            <SectionSubtleText>
-              Connect 3rd party content to your Boost Note for Teams documents.
-            </SectionSubtleText>
+    <SettingTabContent
+      title={translate(lngKeys.SettingsIntegrations)}
+      description={translate(lngKeys.ManageIntegrations)}
+      body={
+        <>
+          <section>
             <StyledServiceList>
               <StyledServiceListItem>
                 <div className='item-info zapier'>
                   <img src='/app/static/logos/zapier.png' alt='Zapier' />
-                  <p>Connect Boost Note for Teams to 2,000+ Apps</p>
+                  <p>Connect Boost Note to 3,000+ Apps</p>
                 </div>
                 <a
                   href='https://zapier.com/apps/boost-hub/integrations'
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('global')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
             </StyledServiceList>
-          </Section>
-          <Section>
-            <SectionHeader2>Popular Integrations</SectionHeader2>
+          </section>
+          <section>
+            <h2>Popular Integrations</h2>
             <StyledServiceList>
               <StyledServiceListItem>
                 <div className='item-info'>
@@ -97,13 +62,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('github')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -113,7 +78,7 @@ const IntegrationsTab = () => {
                     <h3>Trello</h3>
                     <p>
                       e.g., When new Trello card is created, create a new
-                      document on Boost Note for Teams and attach it.
+                      document on Boost Note and attach it.
                     </p>
                   </div>
                 </div>
@@ -122,13 +87,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('trello')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -138,7 +103,7 @@ const IntegrationsTab = () => {
                     <h3>Slack</h3>
                     <p>
                       e.g., Click emoji reaction on the Slack message and
-                      archive it to Boost Note for Teams.
+                      archive it to Boost Note.
                     </p>
                   </div>
                 </div>
@@ -147,13 +112,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('slack')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -172,13 +137,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('gmail')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -191,7 +156,7 @@ const IntegrationsTab = () => {
                     <h3>Google Calendar</h3>
                     <p>
                       e.g., Create an event on Google Calendar and create a
-                      document on Boost Note for Teams automatically.
+                      document on Boost Note automatically.
                     </p>
                   </div>
                 </div>
@@ -200,13 +165,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('google-calendar')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -219,7 +184,7 @@ const IntegrationsTab = () => {
                     <h3>Google Sheets</h3>
                     <p>
                       e.g., Create new rows on Google Sheets for new documents
-                      on Boost Note for Teams.
+                      on Boost Note.
                     </p>
                   </div>
                 </div>
@@ -228,13 +193,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('google-drive')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -253,13 +218,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('jira')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -278,13 +243,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('miro')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -294,7 +259,7 @@ const IntegrationsTab = () => {
                     <h3>Dropbox</h3>
                     <p>
                       e.g., Upload a new text file on Dropbox and create a new
-                      document on Boost Note for Teams.
+                      document on Boost Note.
                     </p>
                   </div>
                 </div>
@@ -303,13 +268,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('dropbox')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -319,7 +284,7 @@ const IntegrationsTab = () => {
                     <h3>Airtable</h3>
                     <p>
                       e.g., Create Airtable records and add new tagged notes in
-                      Boost Note for Teams.
+                      Boost Note.
                     </p>
                   </div>
                 </div>
@@ -328,13 +293,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('airtable')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -353,13 +318,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('clickup')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -372,8 +337,8 @@ const IntegrationsTab = () => {
                     <h3>Amazon Web Service</h3>
                     <p>
                       e.g., Added new functions on AWS, and append content to an
-                      existing note by title inside Boost Note for Teams (it
-                      will be created first if it does not exist.)
+                      existing note by title inside Boost Note (it will be
+                      created first if it does not exist.)
                     </p>
                   </div>
                 </div>
@@ -382,13 +347,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('lambda')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -407,13 +372,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('mailchimp')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -423,7 +388,7 @@ const IntegrationsTab = () => {
                     <h3>Intercom</h3>
                     <p>
                       e.g., A new conversation is created and create a document
-                      on Boost Note for Teams.
+                      on Boost Note.
                     </p>
                   </div>
                 </div>
@@ -432,13 +397,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('intercom')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -458,13 +423,13 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('stripe')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
@@ -480,124 +445,39 @@ const IntegrationsTab = () => {
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('asana')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
               <StyledServiceListItem>
                 <div className='item-info zapier'>
                   <img src='/app/static/logos/zapier.png' alt='Zapier' />
-                  <p>Connect Boost Note for Teams to 2,000+ Apps</p>
+                  <p>Connect Boost Note to 3,000+ Apps</p>
                 </div>
                 <a
                   href='https://zapier.com/apps/boost-hub/integrations'
                   target='_blank'
                   rel='noreferrer noopener'
                 >
-                  <CustomButton
-                    variant='inverse-secondary'
+                  <Button
+                    variant='secondary'
                     className='item-btn'
                     onClick={() => onIntegrationLinkClick('zapier')}
                   >
-                    See
-                  </CustomButton>
+                    {translate(lngKeys.GeneralSeeVerb)}
+                  </Button>
                 </a>
               </StyledServiceListItem>
             </StyledServiceList>
-          </Section>
-          <Section>
-            <SectionHeader2>External Entity</SectionHeader2>
-            <StyledServiceList>
-              <StyledServiceListItem>
-                <div className='item-info'>
-                  <img src='/app/static/logos/github.png' alt='GitHub' />
-                  <div className='item-info-text'>
-                    <h3>GitHub</h3>
-                    <p>
-                      You can embed the Private GitHub issues and pull requests.
-                    </p>
-                    <small>
-                      Manage access via GitHub{' '}
-                      <a
-                        target='_blank'
-                        rel='noreferrer noopener'
-                        href={`https://github.com/settings/connections/applications/${githubOauthId}`}
-                      >
-                        here
-                      </a>
-                    </small>
-                  </div>
-                </div>
-                {(connectionState.type === 'initialising' ||
-                  connectionState.type === 'working') && (
-                  <CustomButton
-                    variant='inverse-secondary'
-                    className='item-btn'
-                  >
-                    <Spinner />
-                  </CustomButton>
-                )}
-                {connectionState.type === 'initialised' && (
-                  <>
-                    {githubConnection == null ? (
-                      usingElectron ? (
-                        <Button
-                          variant='secondary'
-                          onClick={() => {
-                            openNew(`${boostHubBaseUrl}/${team?.domain}`)
-                          }}
-                        >
-                          Open in Browser to enable GitHub app
-                        </Button>
-                      ) : (
-                        <ServiceConnect
-                          variant='inverse-secondary'
-                          className='item-btn'
-                          service='github'
-                          onConnect={connectionState.actions.addConnection}
-                        >
-                          Enable
-                        </ServiceConnect>
-                      )
-                    ) : (
-                      <CustomButton
-                        variant='danger'
-                        className='item-btn'
-                        onClick={removeGithubConnection}
-                      >
-                        Disable
-                      </CustomButton>
-                    )}
-                  </>
-                )}
-              </StyledServiceListItem>
-              <StyledServiceListItem>
-                <p>
-                  Boost Note for Teams will show you the external content such
-                  as Github issues, Trello cards, Google Docs, and much more
-                  automatically. What do you want on Boost Note for Teams?
-                  <button
-                    className='item-info-request'
-                    onClick={() =>
-                      openModal(<FeedbackModal />, {
-                        classNames: 'largeW fixed-height-large',
-                      })
-                    }
-                  >
-                    Please let us know your requests!
-                  </button>
-                </p>
-              </StyledServiceListItem>
-            </StyledServiceList>
-          </Section>
-        </Container>
-      </Scrollable>
-    </Column>
+          </section>
+        </>
+      }
+    ></SettingTabContent>
   )
 }
 
@@ -676,4 +556,4 @@ const StyledServiceListItem = styled.li`
   }
 `
 
-export default withServiceConnections(IntegrationsTab)
+export default IntegrationsTab

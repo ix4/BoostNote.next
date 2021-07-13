@@ -10,15 +10,17 @@ import {
   StyledNavTagsList,
 } from '../../organisms/Sidebar/SideNavigator/styled'
 import cc from 'classcat'
-import { mdiCardTextOutline } from '@mdi/js'
+import { mdiFileDocumentOutline } from '@mdi/js'
 import { getDocTitle } from '../../../lib/utils/patterns'
 import { getFormattedBoosthubDate } from '../../../lib/date'
 import SideNavIcon from '../../organisms/Sidebar/SideNavigator/SideNavIcon'
-import { StyledTag } from '../DocTagsList/styled'
 import styled from '../../../lib/styled'
 import { TimelineUser } from '../../../pages/[teamId]/timeline'
 import Tooltip from '../../atoms/Tooltip'
-import { userIconStyle } from '../../../lib/styled/styleFunctions'
+import {
+  subtleBackgroundColor,
+  userIconStyle,
+} from '../../../lib/styled/styleFunctions'
 
 interface TimelineListItemProps {
   className?: string
@@ -26,6 +28,7 @@ interface TimelineListItemProps {
   team: SerializedTeam
   id: string
   editors: TimelineUser[]
+  path?: string
 }
 
 const TimelineListItem = ({
@@ -34,6 +37,7 @@ const TimelineListItem = ({
   team,
   id,
   editors,
+  path,
 }: TimelineListItemProps) => {
   const [focused, setFocused] = useState(false)
 
@@ -95,7 +99,7 @@ const TimelineListItem = ({
       <div className={cc(['sideNavWrapper'])}>
         <SideNavClickableButtonStyle>
           <SideNavIcon
-            mdiPath={mdiCardTextOutline}
+            mdiPath={mdiFileDocumentOutline}
             item={item}
             type='doc'
             className='marginLeft'
@@ -108,7 +112,8 @@ const TimelineListItem = ({
             id={id}
           >
             <SideNavLabelStyle>
-              {getDocTitle(item, 'Untitled')}
+              {path !== null && <PathLabel>{path}</PathLabel>}
+              <span>{getDocTitle(item, 'Untitled')}</span>
             </SideNavLabelStyle>
             {item.tags != null && item.tags.length > 0 && (
               <StyledNavTagsList>
@@ -136,6 +141,78 @@ const TimelineListItem = ({
     </SideNavItemStyle>
   )
 }
+const StyledTag = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  padding: 2px 5px;
+  ${subtleBackgroundColor}
+  position: relative;
+  margin: 0 ${({ theme }) => theme.space.xxsmall}px;
+  color: ${({ theme }) => theme.baseTextColor};
+  font-size: ${({ theme }) => theme.fontSizes.small}px;
+  border-radius: 3px;
+  vertical-align: middle;
+  height: 25px;
+  line-height: 20px;
+
+  &.toolbar-tag {
+    align-items: center;
+  }
+
+  .removeTag {
+    display: inline-block;
+    cursor: pointer;
+    margin-left: ${({ theme }) => theme.space.xxsmall}px;
+    &:hover,
+    &:focus {
+      color: ${({ theme }) => theme.emphasizedTextColor};
+    }
+
+    &disabled {
+      pointer-events: none;
+    }
+  }
+
+  .tag-link {
+    display: inline-block;
+    max-width: 120px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    color: ${({ theme }) => theme.baseTextColor};
+    text-decoration: none;
+    &:hover,
+    &:focus {
+      opacity: 0.8;
+    }
+  }
+
+  .tag-spinner {
+    margin-top: -3px;
+    margin-right: ${({ theme }) => theme.space.xxsmall}px;
+  }
+
+  &.bg-none {
+    background: none;
+  }
+
+  &.mb-0 {
+    margin-bottom: 0;
+  }
+
+  &.size-s {
+    height: 100%;
+    padding: ${({ theme }) => theme.space.xxsmall}px
+      ${({ theme }) => theme.space.xsmall}px;
+    font-size: ${({ theme }) => theme.fontSizes.xsmall}px;
+    line-height: 1;
+  }
+
+  &.ml-xsmall {
+    margin-left: ${({ theme }) => theme.space.xsmall}px;
+  }
+`
 
 const StyledUsersList = styled.ul`
   display: flex;
@@ -155,6 +232,13 @@ const StyledUsersListItem = styled.div`
   ${userIconStyle}
   width: 24px;
   height: 24px;
+`
+
+const PathLabel = styled.span`
+  display: block;
+  color: ${({ theme }) => theme.subtleTextColor};
+  font-size: ${({ theme }) => theme.fontSizes.default}px;
+  margin-bottom: ${({ theme }) => theme.space.xxsmall}px;
 `
 
 export default TimelineListItem

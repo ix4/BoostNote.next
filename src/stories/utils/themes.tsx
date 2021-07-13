@@ -1,9 +1,9 @@
 import React, { FC, PropsWithChildren, ComponentType } from 'react'
 import { Story } from '@storybook/react/types-6-0'
 import { ThemeProvider } from 'styled-components'
-import { ThemeTypes } from '../../lib/v2/styled/types'
-import styled from '../../lib/styled'
-import { selectV2Theme } from '../../lib/v2/styled/styleFunctions'
+import { ThemeTypes } from '../../shared/lib/styled/types'
+import { selectV2Theme } from '../../shared/lib/styled/styleFunctions'
+import styled from '../../shared/lib/styled'
 
 interface ThemedWrapperProps {
   theme?: ThemeTypes
@@ -27,7 +27,7 @@ const StyledBackground = styled.div`
   right: 0;
   bottom: 0;
   padding: 10px;
-  background-color: ${({ theme }) => theme.backgroundColor};
+  background-color: ${({ theme }) => theme.colors.background.primary};
   box-sizing: border-box;
 `
 

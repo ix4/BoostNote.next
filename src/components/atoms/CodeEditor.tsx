@@ -1,17 +1,19 @@
 import React from 'react'
-import CodeMirror, { getCodeMirrorTheme } from '../../lib/CodeMirror'
-import styled from '../../lib/styled'
-import { borderRight } from '../../lib/styled/styleFunctions'
+import { getCodeMirrorTheme } from '../../lib/CodeMirror'
 import {
   EditorIndentTypeOptions,
   EditorIndentSizeOptions,
   EditorKeyMapOptions,
 } from '../../lib/preferences'
 import { osName } from '../../lib/platform'
+import styled from '../../shared/lib/styled'
+import { borderRight } from '../../shared/lib/styled/styleFunctions'
+import CodeMirror from '../../lib/CodeMirror'
 
 const StyledContainer = styled.div`
   .CodeMirror {
     font-family: inherit;
+    z-index: 0 !important;
   }
 
   .CodeMirror-dialog button {
@@ -21,7 +23,7 @@ const StyledContainer = styled.div`
     line-height: 26px;
     padding: 0 15px;
     transition: color 200ms ease-in-out;
-    color: ${({ theme }) => theme.primaryDarkerColor};
+    color: ${({ theme }) => theme.colors.text.primary};
     border: none;
     ${borderRight}
     &:last-child {
@@ -30,8 +32,26 @@ const StyledContainer = styled.div`
   }
 
   .CodeMirror-dialog button:hover {
-    color: ${({ theme }) => theme.primaryButtonLabelColor};
-    background-color: ${({ theme }) => theme.primaryColor};
+    color: ${({ theme }) => theme.colors.text.secondary};
+    background-color: ${({ theme }) => theme.colors.background.primary};
+  }
+
+  .marked {
+    background-color: ${({ theme }) =>
+      theme.codeEditorMarkedTextBackgroundColor};
+    color: #212121 !important;
+    padding: 3px;
+  }
+
+  .marked + .marked {
+    margin-left: -3px;
+    padding-left: 0;
+  }
+
+  .selected {
+    background-color: ${({ theme }) =>
+      theme.codeEditorSelectedTextBackgroundColor};
+    border: 1px solid #fffae3;
   }
 `
 
@@ -54,16 +74,29 @@ interface CodeEditorProps {
   indentType?: EditorIndentTypeOptions
   indentSize?: EditorIndentSizeOptions
   keyMap?: EditorKeyMapOptions
+  getCustomKeymap: (key: string) => string | null
   mode?: string
   readonly?: boolean
   onPaste?: (codeMirror: CodeMirror.Editor, event: ClipboardEvent) => void
   onDrop?: (codeMirror: CodeMirror.Editor, event: DragEvent) => void
   onCursorActivity?: (codeMirror: CodeMirror.Editor) => void
+  onLocalSearchToggle?: (
+    codeMirror: CodeMirror.Editor,
+    showLocalSearch: boolean
+  ) => void
+  onLocalSearchReplaceToggle?: (
+    codeMirror: CodeMirror.Editor,
+    showLocalReplace: boolean
+  ) => void
 }
 
 class CodeEditor extends React.Component<CodeEditorProps> {
   textAreaRef = React.createRef<HTMLTextAreaElement>()
   codeMirror?: CodeMirror.EditorFromTextArea
+  prevLocalSearchShortcut?: string
+  prevLocalReplaceShortcut?: string
+  prevInsertLocaleDateShortcut?: string
+  prevInsertDateAndTimeShortcut?: string
 
   componentDidMount() {
     const indentSize = this.props.indentSize == null ? 2 : this.props.indentSize
@@ -71,6 +104,8 @@ class CodeEditor extends React.Component<CodeEditorProps> {
       this.props.keyMap == null || this.props.keyMap === 'default'
         ? 'sublime'
         : this.props.keyMap
+
+    const extraKeys = this.getExtraKeys(keyMap)
     this.codeMirror = CodeMirror.fromTextArea(this.textAreaRef.current!, {
       ...defaultCodeMirrorOptions,
       theme: getCodeMirrorTheme(this.props.theme),
@@ -80,12 +115,7 @@ class CodeEditor extends React.Component<CodeEditorProps> {
       keyMap,
       mode: this.props.mode || 'gfm',
       readOnly: this.props.readonly === true,
-      extraKeys: {
-        Enter: 'newlineAndIndentContinueMarkdownList',
-        Tab: 'indentMore',
-        [osName === 'macos' ? 'Cmd-Alt-F' : 'Ctrl-Alt-F']: 'findPersistent',
-        Esc: 'clearSearch',
-      },
+      extraKeys: extraKeys,
       scrollPastEnd: true,
     })
     this.codeMirror.on('change', this.handleCodeMirrorChange)
@@ -132,12 +162,31 @@ class CodeEditor extends React.Component<CodeEditorProps> {
       this.codeMirror.setOption('indentUnit', indentSize)
       this.codeMirror.setOption('tabSize', indentSize)
     }
+
+    const keyMap =
+      this.props.keyMap == null || this.props.keyMap === 'default'
+        ? 'sublime'
+        : this.props.keyMap
     if (this.props.keyMap !== prevProps.keyMap) {
-      const keyMap =
-        this.props.keyMap == null || this.props.keyMap === 'default'
-          ? 'sublime'
-          : this.props.keyMap
       this.codeMirror.setOption('keyMap', keyMap)
+    }
+
+    const [
+      localSearchShortcut,
+      localReplaceShortcut,
+    ] = this.getCurrentSearchKeymaps()
+    const [
+      insertLocaleDateShortcut,
+      insertDateAndTimeShortcut,
+    ] = this.getCurrentDateKeymaps()
+    if (
+      this.props.keyMap !== prevProps.keyMap ||
+      this.prevLocalSearchShortcut != localSearchShortcut ||
+      this.prevLocalReplaceShortcut != localReplaceShortcut ||
+      this.prevInsertLocaleDateShortcut != insertLocaleDateShortcut ||
+      this.prevInsertDateAndTimeShortcut != insertDateAndTimeShortcut
+    ) {
+      this.codeMirror.setOption('extraKeys', this.getExtraKeys(keyMap))
     }
   }
 
@@ -149,6 +198,108 @@ class CodeEditor extends React.Component<CodeEditorProps> {
       this.codeMirror.off('cursorActivity', this.handleCursorActivity)
     }
     window.removeEventListener('codemirror-mode-load', this.reloadMode)
+  }
+
+  getCurrentSearchKeymaps(): string[] {
+    let localSearchShortcut = this.props.getCustomKeymap('toggleLocalSearch')
+    let localReplaceShortcut = this.props.getCustomKeymap('toggleLocalReplace')
+    if (localSearchShortcut == null) {
+      localSearchShortcut = osName === 'macos' ? 'Cmd+F' : 'Ctrl+F'
+    }
+    if (localReplaceShortcut == null) {
+      localReplaceShortcut = osName === 'macos' ? 'Cmd-H' : 'Ctrl-H'
+    }
+    return [localSearchShortcut, localReplaceShortcut]
+  }
+
+  getCurrentDateKeymaps(): string[] {
+    let insertLocaleDateShortcut = this.props.getCustomKeymap(
+      'insertLocaleDateString'
+    )
+    let insertDateAndTimeShortcut = this.props.getCustomKeymap(
+      'insertDateAndTimeString'
+    )
+    if (insertLocaleDateShortcut == null) {
+      insertLocaleDateShortcut =
+        osName === 'macos' ? 'Shift-Cmd-/' : 'Shift-Ctrl-/'
+    }
+    if (insertDateAndTimeShortcut == null) {
+      insertDateAndTimeShortcut =
+        osName === 'macos' ? 'Cmd-Alt-/' : 'Ctrl-Alt-/'
+    }
+    return [insertLocaleDateShortcut, insertDateAndTimeShortcut]
+  }
+
+  getExtraKeys = (keyMapStyle: string) => {
+    const [
+      localSearchShortcut,
+      localReplaceShortcut,
+    ] = this.getCurrentSearchKeymaps()
+    const extraKeys = {
+      Enter: 'newlineAndIndentContinueMarkdownList',
+      Tab: 'indentMore',
+      Esc: (cm: CodeMirror.Editor) => {
+        if (keyMapStyle === 'vim') {
+          return CodeMirror.Pass
+        } else {
+          this.handleOnLocalSearchToggle(cm, false)
+          return this.handleOnLocalSearchReplaceToggle(cm, false)
+        }
+      },
+    }
+    extraKeys[localSearchShortcut] = (cm: CodeMirror.Editor) =>
+      this.handleOnLocalSearchToggle(cm, true)
+    extraKeys[localReplaceShortcut] = (cm: CodeMirror.Editor) =>
+      this.handleOnLocalSearchReplaceToggle(cm, true)
+
+    const [
+      insertLocaleDateShortcut,
+      insertDateAndTimeShortcut,
+    ] = this.getCurrentDateKeymaps()
+    extraKeys[insertLocaleDateShortcut] = (cm: CodeMirror.Editor) =>
+      this.handleInsertLocaleDateString(cm)
+    extraKeys[insertDateAndTimeShortcut] = (cm: CodeMirror.Editor) =>
+      this.handleInsertLocaleString(cm)
+
+    this.prevLocalSearchShortcut = localSearchShortcut
+    this.prevLocalReplaceShortcut = localReplaceShortcut
+    this.prevInsertLocaleDateShortcut = insertLocaleDateShortcut
+    this.prevInsertDateAndTimeShortcut = insertDateAndTimeShortcut
+    return extraKeys
+  }
+
+  handleInsertLocaleDateString = (editor: CodeMirror.Editor) => {
+    const dateNow = new Date()
+    editor.replaceSelection(dateNow.toLocaleDateString())
+  }
+
+  handleInsertLocaleString = (editor: CodeMirror.Editor) => {
+    const dateNow = new Date()
+    editor.replaceSelection(dateNow.toLocaleString())
+  }
+
+  handleOnLocalSearchReplaceToggle = (
+    editor: CodeMirror.Editor,
+    showLocalReplace: boolean
+  ) => {
+    const { onLocalSearchReplaceToggle } = this.props
+    if (onLocalSearchReplaceToggle == null) {
+      return
+    }
+
+    onLocalSearchReplaceToggle(editor, showLocalReplace)
+  }
+
+  handleOnLocalSearchToggle = (
+    editor: CodeMirror.Editor,
+    showLocalSearch: boolean
+  ) => {
+    const { onLocalSearchToggle } = this.props
+    if (onLocalSearchToggle == null) {
+      return
+    }
+
+    onLocalSearchToggle(editor, showLocalSearch)
   }
 
   handlePaste = (editor: CodeMirror.Editor, event: ClipboardEvent) => {

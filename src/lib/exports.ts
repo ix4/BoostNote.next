@@ -6,18 +6,15 @@ import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
 import rehypeStringify from 'rehype-stringify'
 import rehypeKatex from 'rehype-katex'
-import remarkAdmonitions from 'remark-admonitions'
 import { mergeDeepRight } from 'ramda'
 import gh from 'hast-util-sanitize/lib/github.json'
-import { rehypeCodeMirror } from '../components/atoms/MarkdownPreviewer'
-import { downloadBlob } from './download'
+import rehypeCodeMirror from '../shared/lib/codemirror/rehypeCodeMirror'
 import { Attachment, NoteDoc, ObjectMap } from './db/types'
 import { filenamify } from './string'
 import React from 'react'
 import remarkEmoji from 'remark-emoji'
 import rehypeReact from 'rehype-react'
-import CodeFence from '../components/atoms/markdown/CodeFence'
-import { getGlobalCss, selectTheme } from './styled/styleUtil'
+import CodeFence from '../shared/components/atoms/markdown/CodeFence'
 import yaml from 'yaml'
 import {
   convertHtmlStringToPdfBuffer,
@@ -27,15 +24,24 @@ import {
   showOpenDialog,
   writeFile,
   readdir,
+  openPath,
 } from './electronOnly'
 import { join } from 'path'
 import { dev } from '../electron/consts'
 import { excludeFileProtocol } from './db/utils'
 import {
+  rehypeChart,
+  rehypeFlowChart,
   rehypeMermaid,
   remarkCharts,
   remarkPlantUML,
 } from '../cloud/lib/charts'
+import remarkSlug from 'remark-slug'
+import { rehypePosition } from '../cloud/lib/rehypePosition'
+import remarkAdmonitions from 'remark-admonitions'
+import { getGlobalCss } from '../shared/components/atoms/GlobalStyle'
+import { selectV2Theme } from '../shared/lib/styled/styleFunctions'
+import { ThemeTypes } from '../shared/lib/styled/types'
 
 interface ImageData {
   name: string
@@ -58,7 +64,16 @@ const schema = mergeDeepRight(gh, {
     path: ['d'],
     svg: ['viewBox'],
   },
-  tagNames: [...gh.tagNames, 'svg', 'path', 'mermaid', 'iframe'],
+  tagNames: [
+    ...gh.tagNames,
+    'svg',
+    'path',
+    'mermaid',
+    'flowchart',
+    'chart',
+    'chart(yaml)',
+    'iframe',
+  ],
 })
 
 export async function openDialog(): Promise<string> {
@@ -192,7 +207,7 @@ function getCssLinkCommonPath(prependFilePrefix = false) {
 
 async function getExportStylesInfo(
   codeBlockTheme: string,
-  generalThemeName: string,
+  generalThemeName: ThemeTypes,
   previewStyle?: string
 ) {
   const cssStyles: CssStyleInfo[] = []
@@ -200,7 +215,7 @@ async function getExportStylesInfo(
   const cssFileRoot = getCssLinkCommonPath(false)
   const markdownCodeBlockTheme =
     codeBlockTheme === 'solarized-dark' ? 'solarized' : codeBlockTheme
-  const appThemeCss = getGlobalCss(selectTheme(generalThemeName))
+  const appThemeCss = getGlobalCss(selectV2Theme(generalThemeName))
 
   if (appThemeCss) {
     cssStyles.push({ filename: 'globalTheme.css', content: appThemeCss })
@@ -291,7 +306,7 @@ ${getPrintStyleForExports()}
 
 async function generateCssForPrintToPdf(
   codeBlockTheme: string,
-  generalThemeName: string,
+  generalThemeName: ThemeTypes,
   previewStyle?: string
 ) {
   const cssStyleInfos: CssStyleInfo[] = await getExportStylesInfo(
@@ -419,6 +434,10 @@ function revokeAttachmentsUrls(attachmentUrls: string[]) {
   })
 }
 
+export function getValidNoteTitle(note: NoteDoc): string {
+  return note.title ? note.title : 'Untitled-' + note._id
+}
+
 export function convertNoteDocToMarkdownString(
   note: NoteDoc,
   includeFrontMatter: boolean
@@ -449,6 +468,8 @@ async function convertNoteDocToMarkdownHtmlString(
     .use(remarkCharts)
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeRaw)
+    .use(remarkSlug)
+    .use(rehypePosition)
     .use(rehypeSanitize, schema)
     .use(rehypeKatex, { output: 'htmlAndMathml' })
     .use(rehypeCodeMirror, {
@@ -456,15 +477,18 @@ async function convertNoteDocToMarkdownHtmlString(
       theme: codeBlockTheme,
     })
     .use(rehypeMermaid)
+    .use(rehypeFlowChart)
+    .use(rehypeChart, { tagName: 'chart' })
+    .use(rehypeChart, { tagName: 'chart(yaml)', isYml: true })
     .use(rehypeReact, {
       createElement: React.createElement,
+      Fragment: React.Fragment,
       components: {
         pre: CodeFence,
       },
     })
     .use(rehypeStringify)
     .process(note.content)
-
   return output.toString('utf-8').trim() + '\n'
 }
 
@@ -503,10 +527,11 @@ export const exportNoteAsHtmlFile = async (
   saveFilename: string,
   note: NoteDoc,
   codeBlockTheme: string,
-  generalThemeName: string,
+  generalThemeName: ThemeTypes,
   pushMessage: (context: any) => any,
   attachmentMap: ObjectMap<Attachment>,
-  previewStyle?: string
+  previewStyle?: string,
+  silent?: boolean
 ): Promise<void> => {
   try {
     const markdownHtmlContent = await convertNoteDocToMarkdownHtmlString(
@@ -556,22 +581,29 @@ export const exportNoteAsHtmlFile = async (
     )
     await writeFile(saveLocation, htmlString)
   } catch (error) {
-    pushMessage({
-      title: 'Note processing failed',
-      description: 'Please check markdown syntax and try again later.',
-    })
-    console.warn(error)
+    if (silent !== null && silent === true) {
+      throw new Error(
+        error ? error.message : 'Note processing failed, check markdown syntax.'
+      )
+    } else {
+      pushMessage({
+        title: 'Note processing failed',
+        description: 'Please check markdown syntax and try again later.',
+      })
+      console.warn(error)
+    }
   }
 }
 
-export async function convertNoteDocToPdfBuffer(
+export const convertNoteDocToPdfBuffer = async (
   note: NoteDoc,
   codeBlockTheme: string,
-  generalThemeName: string,
+  generalThemeName: ThemeTypes,
   pushMessage: (context: any) => any,
   attachmentMap: ObjectMap<Attachment>,
+  printOpts: Electron.PrintToPDFOptions,
   previewStyle?: string
-): Promise<Buffer> {
+): Promise<Buffer> => {
   const markdownHtmlContent = await convertNoteDocToMarkdownHtmlString(
     note,
     codeBlockTheme
@@ -596,14 +628,6 @@ export async function convertNoteDocToPdfBuffer(
   )
 
   try {
-    const printOpts = {
-      // Needed for codemirorr themes (backgrounds)
-      printBackground: true,
-      // Enable margins if header and footer is printed!
-      // No margins 1, default margins 0, 2 - minimum margins
-      marginsType: 0, // This could be chosen by user.
-      pageSize: 'A4', // This could be chosen by user.
-    }
     return await convertHtmlStringToPdfBuffer(htmlString, printOpts)
   } finally {
     revokeAttachmentsUrls(attachmentUrls)
@@ -611,11 +635,13 @@ export async function convertNoteDocToPdfBuffer(
 }
 
 export const exportNoteAsPdfFile = async (
+  filePath: string,
   note: NoteDoc,
   codeBlockTheme: string,
-  generalThemeName: string,
+  generalThemeName: ThemeTypes,
   pushMessage: (context: any) => any,
   attachmentMap: ObjectMap<Attachment>,
+  printOptions: Electron.PrintToPDFOptions,
   previewStyle?: string
 ): Promise<void> => {
   try {
@@ -625,13 +651,20 @@ export const exportNoteAsPdfFile = async (
       generalThemeName,
       pushMessage,
       attachmentMap,
+      printOptions,
       previewStyle
     )
-    const pdfName = `${filenamify(note.title)}.pdf`
-
-    downloadBlob(new Blob([pdfBuffer]), pdfName)
+    await writeFile(filePath, pdfBuffer)
+    pushMessage({
+      onClick: () => {
+        openPath(filePath)
+      },
+      type: 'success',
+      title: 'PDF export',
+      description: 'PDF file exported successfully.',
+    })
   } catch (error) {
-    console.warn(error)
+    console.error(error)
     pushMessage({
       title: 'PDF export failed',
       description: error.message,

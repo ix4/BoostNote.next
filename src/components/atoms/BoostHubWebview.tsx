@@ -18,7 +18,6 @@ import {
   NewWindowEvent,
 } from 'electron'
 import { useEffectOnce } from 'react-use'
-import styled from '../../lib/styled'
 import { openNew } from '../../lib/platform'
 import {
   boostHubNavigateRequestEventEmitter,
@@ -28,11 +27,16 @@ import {
   boostHubAccountDeleteEventEmitter,
   boostHubReloadAllWebViewsEventEmitter,
   boostHubCreateLocalSpaceEventEmitter,
-  boostHubSidebarStateEventEmitter,
+  boostHubSubscriptionDeleteEventEmitter,
+  boostHubSubscriptionUpdateEventEmitter,
+  boosthubNotificationCountsEventEmitter,
+  boostHubSidebarSpaceEventEmitter,
+  boostHubAppRouterEventEmitter,
 } from '../../lib/events'
 import { usePreferences } from '../../lib/preferences'
-import { openContextMenu } from '../../lib/electronOnly'
+import { openContextMenu, openExternal } from '../../lib/electronOnly'
 import { DidFailLoadEvent } from 'electron/main'
+import styled from '../../shared/lib/styled'
 
 export interface WebviewControl {
   focus(): void
@@ -139,6 +143,12 @@ const BoostHubWebview = ({
 
     const ipcMessageEventHandler = (event: IpcMessageEvent) => {
       switch (event.channel) {
+        case 'router':
+          boostHubAppRouterEventEmitter.dispatch({ target: event.args[0] })
+          break
+        case 'sidebar-spaces':
+          boostHubSidebarSpaceEventEmitter.dispatch()
+          break
         case 'request-app-navigate':
           boostHubNavigateRequestEventEmitter.dispatch({ url: event.args[0] })
           break
@@ -151,8 +161,18 @@ const BoostHubWebview = ({
         case 'team-update':
           boostHubTeamUpdateEventEmitter.dispatch({ team: event.args[0] })
           break
-        case 'sidebar--state':
-          boostHubSidebarStateEventEmitter.dispatch(event.args[0])
+        case 'notification-counts':
+          boosthubNotificationCountsEventEmitter.dispatch(event.args[0])
+          break
+        case 'subscription-update':
+          boostHubSubscriptionUpdateEventEmitter.dispatch({
+            subscription: event.args[0],
+          })
+          break
+        case 'subscription-delete':
+          boostHubSubscriptionDeleteEventEmitter.dispatch({
+            subscription: event.args[0],
+          })
           break
         case 'team-delete':
           boostHubTeamDeleteEventEmitter.dispatch({ team: event.args[0] })
@@ -162,6 +182,10 @@ const BoostHubWebview = ({
           break
         case 'request-access-token':
           webview.send('update-access-token', accessToken)
+          break
+        case 'open-external-url':
+          const [url] = event.args
+          openExternal(url)
           break
         case 'open-context-menu':
           openContextMenu({
@@ -274,17 +298,6 @@ const Container = styled.div`
   position: relative;
   width: 100%;
   height: 100%;
-  & > .draggable {
-    position: absolute;
-    z-index: 1;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 44px;
-    background-color: rgba(255, 0, 0, 0.2);
-    -webkit-user-select: none;
-    opacity: 0;
-  }
 
   & > webview {
     z-index: 0;

@@ -9,9 +9,11 @@ import {
   toggleSettingsEventEmitter,
   toggleSettingsMembersEventEmitter,
 } from '../../utils/events'
-import { useToast } from '../../../../lib/v2/stores/toast'
+import { useToast } from '../../../../shared/lib/stores/toast'
+import { UpgradeTabOpeningOptions } from '../../../components/organisms/settings/UpgradeTab'
 
 export const baseUserSettings: UserSettings = {
+  'general.language': 'en-US',
   'general.theme': 'dark',
   'general.editorTheme': 'default',
   'general.codeBlockTheme': 'default',
@@ -27,14 +29,25 @@ export type SettingsTab =
   | 'teamInfo'
   | 'teamMembers'
   | 'integrations'
+  | 'integrations.github'
+  | 'integrations.slack'
   | 'teamUpgrade'
   | 'teamSubscription'
   | 'api'
+  | 'feedback'
+  | 'import'
+  | 'attachments'
+
+export type SettingsTabOpeningOptions = UpgradeTabOpeningOptions
 
 function useSettingsStore() {
   const { globalData, setPartialGlobalData } = useGlobalData()
   const { currentUserSettings, currentUser } = globalData
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('personalInfo')
+  const [settingsOpeningOptions, setSettingsOpeningOptions] = useState<
+    SettingsTabOpeningOptions
+  >()
+
   const { pushMessage } = useToast()
   const { t } = useTranslation()
 
@@ -46,15 +59,19 @@ function useSettingsStore() {
   }
 
   const [settings, setSettings] = useSetState<UserSettings>(initialUserSettings)
-
+  const previousSettingsRef = useRef(settings)
   const currentUserId = currentUser?.id
   useEffect(() => {
     if (saveTimer.current != null) {
       clearTimeout(saveTimer.current)
     }
-    if (currentUserId) {
+    if (currentUserId == null) {
       return
     }
+    if (previousSettingsRef.current === settings) {
+      return
+    }
+    previousSettingsRef.current = settings
     saveTimer.current = setTimeout(() => {
       saveUserSettings({
         value: JSON.stringify(settings),
@@ -89,6 +106,7 @@ function useSettingsStore() {
 
   const closeSettingsTab = useCallback(() => {
     setClosed(true)
+    setSettingsOpeningOptions(undefined)
   }, [setClosed])
 
   const currentLanguage = mergedUserSettings['general.language']
@@ -98,8 +116,9 @@ function useSettingsStore() {
   }, [i18n, currentLanguage])
 
   const openSettingsTab = useCallback(
-    (tab: SettingsTab) => {
+    (tab: SettingsTab, options?: SettingsTabOpeningOptions) => {
       setClosed(false)
+      setSettingsOpeningOptions(options)
       setSettingsTab(tab)
       return
     },
@@ -150,6 +169,7 @@ function useSettingsStore() {
     settings: mergedUserSettings,
     setSettings,
     settingsTab,
+    settingsOpeningOptions,
     openSettingsTab,
     closeSettingsTab,
     emailNotifications,

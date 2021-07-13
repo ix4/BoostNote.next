@@ -24,8 +24,17 @@ export type SseEventType =
   | 'teamUpdate'
   | 'templateUpdate'
   | 'templateDelete'
-  | 'guestUpdate'
-  | 'guestRemoval'
+  | 'commentThreadCreated'
+  | 'commentThreadUpdated'
+  | 'commentThreadDeleted'
+  | 'commentCreated'
+  | 'commentUpdated'
+  | 'commentDeleted'
+  | 'smartFolderCreate'
+  | 'smartFolderUpdate'
+  | 'smartFolderDelete'
+  | 'notificationCreated'
+  | 'notificationViewed'
 
 export interface SerializableAppEventProps {
   id: string

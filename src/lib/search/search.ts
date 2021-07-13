@@ -1,4 +1,4 @@
-import { NoteDoc } from '../db/types'
+import { FolderDoc, NoteDoc } from '../db/types'
 import { EditorPosition } from '../CodeMirror'
 
 export interface SearchResult {
@@ -15,11 +15,38 @@ export interface TagSearchResult {
   matchString: string
 }
 
+type FolderSearchResult = {
+  type: 'folder'
+  result: FolderDoc
+}
+
+type NoteSearchResult = {
+  type: 'note'
+  result: NoteDoc
+}
+
+type NoteContentSearchResult = {
+  type: 'noteContent'
+  result: NoteDoc
+  context: string
+}
+
+export type SearchResultItem =
+  | FolderSearchResult
+  | NoteSearchResult
+  | NoteContentSearchResult
+
 export interface NoteSearchData {
   titleSearchResult: string | null
   tagSearchResults: TagSearchResult[]
   results: SearchResult[]
-  note: NoteDoc
+  item: SearchResultItem
+}
+
+export interface SearchReplaceOptions {
+  regexSearch: boolean
+  caseSensitiveSearch: boolean
+  preservingCaseReplace: boolean
 }
 
 const SEARCH_MEGABYTES_PER_NOTE = 30
@@ -27,7 +54,17 @@ export const MAX_SEARCH_PREVIEW_LINE_LENGTH = 10000
 export const MAX_SEARCH_CONTENT_LENGTH_PER_NOTE =
   SEARCH_MEGABYTES_PER_NOTE * 10e6
 export const SEARCH_DEBOUNCE_TIMEOUT = 350
-export const MERGE_SAME_LINE_RESULTS_INTO_ONE = true
+export const GLOBAL_MERGE_SAME_LINE_RESULTS_INTO_ONE = true
+export const LOCAL_MERGE_SAME_LINE_RESULTS_INTO_ONE = false
+
+export interface GetSearchResultsRequestQuery {
+  query: string
+  body?: boolean
+  title?: boolean
+  parentFolderId?: string
+  tagId?: string
+  archived?: boolean
+}
 
 export function getSearchResultKey(noteId: string, searchItemId: string) {
   return `${noteId}${searchItemId}`
@@ -55,7 +92,11 @@ function getMatchDataFromGlobalColumn(
   }
 }
 
-export function getMatchData(text: string, searchTerm: RegExp): SearchResult[] {
+export function getMatchData(
+  text: string,
+  searchTerm: RegExp,
+  mergeSameLineResults = GLOBAL_MERGE_SAME_LINE_RESULTS_INTO_ONE
+): SearchResult[] {
   const data: SearchResult[] = []
 
   let resultId = 0
@@ -71,7 +112,7 @@ export function getMatchData(text: string, searchTerm: RegExp): SearchResult[] {
     const matchStr = match[0]
     const matchIndex: number = match.index ? match.index : 0
     const pos = getMatchDataFromGlobalColumn(lines, matchIndex)
-    if (MERGE_SAME_LINE_RESULTS_INTO_ONE) {
+    if (mergeSameLineResults) {
       if (pos.line == previousLineNumber) {
         continue
       } else {
@@ -87,5 +128,6 @@ export function getMatchData(text: string, searchTerm: RegExp): SearchResult[] {
       matchString: matchStr,
     })
   }
+
   return data
 }

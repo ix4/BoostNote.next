@@ -5,36 +5,38 @@ import React, {
   useRef,
   KeyboardEvent,
 } from 'react'
-import styled from '../../lib/styled'
 import { NoteDoc, NoteStorage } from '../../lib/db/types'
 import { useEffectOnce, useDebounce } from 'react-use'
-import { excludeNoteIdPrefix, values } from '../../lib/db/utils'
-import { escapeRegExp } from '../../lib/string'
+import { excludeNoteIdPrefix } from '../../lib/db/utils'
 import { useSearchModal } from '../../lib/searchModal'
+import { mdiMagnify, mdiClose, mdiCardTextOutline } from '@mdi/js'
+import SearchModalNoteResultItem from '../molecules/SearchModalNoteResultItem'
+import { useStorageRouter } from '../../lib/storageRouter'
+import {
+  getSearchResultKey,
+  NoteSearchData,
+  SearchResult,
+  SEARCH_DEBOUNCE_TIMEOUT,
+  GLOBAL_MERGE_SAME_LINE_RESULTS_INTO_ONE,
+} from '../../lib/search/search'
+import CustomizedCodeEditor from '../atoms/CustomizedCodeEditor'
+import CodeMirror from '../../lib/CodeMirror'
+import cc from 'classcat'
+import styled from '../../shared/lib/styled'
+import { BaseTheme } from '../../shared/lib/styled/types'
 import {
   border,
   borderBottom,
   borderTop,
   flexCenter,
   textOverflow,
-} from '../../lib/styled/styleFunctions'
-import { mdiMagnify, mdiClose, mdiCardTextOutline } from '@mdi/js'
-import Icon from '../atoms/Icon'
-import SearchModalNoteResultItem from '../molecules/SearchModalNoteResultItem'
-import { useStorageRouter } from '../../lib/storageRouter'
+} from '../../shared/lib/styled/styleFunctions'
 import {
-  getMatchData,
-  getSearchResultKey,
-  NoteSearchData,
-  SearchResult,
-  SEARCH_DEBOUNCE_TIMEOUT,
-  MERGE_SAME_LINE_RESULTS_INTO_ONE,
-  TagSearchResult,
-} from '../../lib/search/search'
-import CustomizedCodeEditor from '../atoms/CustomizedCodeEditor'
-import CodeMirror from 'codemirror'
-import { BaseTheme } from '../../lib/styled/BaseTheme'
-import cc from 'classcat'
+  getSearchResultItems,
+  getSearchRegex,
+} from '../../lib/v2/mappers/local/searchResults'
+import Icon from '../../shared/components/atoms/Icon'
+import { useGeneralStatus } from '../../lib/generalStatus'
 
 interface SearchModalProps {
   storage: NoteStorage
@@ -47,6 +49,7 @@ const SearchModal = ({ storage }: SearchModalProps) => {
   const [searchValue, setSearchValue] = useState('')
   const [resultList, setResultList] = useState<NoteSearchData[]>([])
   const [searching, setSearching] = useState(false)
+  const { setGeneralStatus } = useGeneralStatus()
   const { toggleShowSearchModal } = useSearchModal()
   const searchTextAreaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -69,18 +72,17 @@ const SearchModal = ({ storage }: SearchModalProps) => {
     focusTextAreaInput()
   })
 
-  const getSearchRegex = useCallback((rawSearch) => {
-    return new RegExp(escapeRegExp(rawSearch), 'gim')
-  }, [])
-
   const { navigateToNoteWithEditorFocus: _navFocusEditor } = useStorageRouter()
 
   const navFocusEditor = useCallback(
     (noteId: string, lineNum: number, lineColumn = 0) => {
+      setGeneralStatus({
+        focusOnEditorCursor: true,
+      })
       toggleShowSearchModal()
       _navFocusEditor(storage.id, noteId, '/', `${lineNum},${lineColumn}`)
     },
-    [toggleShowSearchModal, _navFocusEditor, storage.id]
+    [setGeneralStatus, toggleShowSearchModal, _navFocusEditor, storage.id]
   )
 
   useDebounce(
@@ -90,48 +92,13 @@ const SearchModal = ({ storage }: SearchModalProps) => {
         setSearching(false)
         return
       }
-      const notes = values(storage.noteMap)
-      const regex = getSearchRegex(searchValue)
-      // todo: [komediruzecki-01/12/2020] Here we could have buttons (toggles) for content/title/tag search! (by tag color?)
-      //  for now, it's only content search
-      const searchResultData: NoteSearchData[] = []
-      notes.forEach((note) => {
-        if (note.trashed) {
-          return
-        }
-        const matchDataContent = getMatchData(note.content, regex)
-
-        const titleMatchResult = note.title.match(regex)
-
-        const titleSearchResult =
-          titleMatchResult != null ? titleMatchResult[0] : null
-        const tagSearchResults = note.tags.reduce<TagSearchResult[]>(
-          (searchResults, tagName) => {
-            const matchResult = tagName.match(regex)
-            if (matchResult != null) {
-              searchResults.push({
-                tagName,
-                matchString: matchResult[0],
-              })
-            }
-            return searchResults
-          },
-          []
-        )
-
-        if (
-          titleSearchResult ||
-          tagSearchResults.length > 0 ||
-          matchDataContent.length > 0
-        ) {
-          const noteResultKey = excludeNoteIdPrefix(note._id)
-          noteToSearchResultMap[noteResultKey] = matchDataContent
-          searchResultData.push({
-            titleSearchResult,
-            tagSearchResults,
-            note: note,
-            results: matchDataContent,
-          })
+      const searchResultData = getSearchResultItems(storage, searchValue)
+      searchResultData.forEach((searchResult) => {
+        if (searchResult.item.type === 'noteContent') {
+          const noteResultKey = excludeNoteIdPrefix(
+            searchResult.item.result._id
+          )
+          noteToSearchResultMap[noteResultKey] = searchResult.results
         }
       })
 
@@ -150,7 +117,7 @@ const SearchModal = ({ storage }: SearchModalProps) => {
       toggleShowSearchModal()
       _navigateToNote(storage.id, noteId)
     },
-    [storage.id, _navigateToNote, toggleShowSearchModal]
+    [toggleShowSearchModal, _navigateToNote, storage.id]
   )
 
   const handleSearchInputKeyDown = useCallback(
@@ -173,8 +140,9 @@ const SearchModal = ({ storage }: SearchModalProps) => {
       if (codeEditor) {
         const cursor = codeEditor.getSearchCursor(getSearchRegex(searchValue))
         let first = true
-        let from, to
-        let currentItemId = 0
+        let from: CodeMirror.Position
+        let to: CodeMirror.Position
+        let currentItemIndex = 0
         let previousLine = -1
         let lineChanged = false
         while (cursor.findNext()) {
@@ -188,24 +156,24 @@ const SearchModal = ({ storage }: SearchModalProps) => {
 
           lineChanged = from.line != previousLine
           previousLine = from.line
-          if (MERGE_SAME_LINE_RESULTS_INTO_ONE) {
+          if (GLOBAL_MERGE_SAME_LINE_RESULTS_INTO_ONE) {
             if (lineChanged) {
-              currentItemId++
+              currentItemIndex++
             }
           }
 
           codeEditor.markText(from, to, {
             className:
-              currentItemId == selectedItemId ? 'marked selected' : 'marked',
+              currentItemIndex == selectedItemId ? 'marked selected' : 'marked',
           })
 
-          if (!MERGE_SAME_LINE_RESULTS_INTO_ONE) {
-            currentItemId++
+          if (!GLOBAL_MERGE_SAME_LINE_RESULTS_INTO_ONE) {
+            currentItemIndex++
           }
         }
       }
     },
-    [getSearchRegex]
+    []
   )
 
   const focusEditorOnSelectedItem = useCallback(
@@ -300,19 +268,23 @@ const SearchModal = ({ storage }: SearchModalProps) => {
             <div className='empty'>No Results</div>
           )}
           {!searching &&
-            resultList.map((result) => {
+            resultList.map((searchData) => {
+              if (searchData.item.type === 'folder') {
+                return
+              }
+              const noteResult: NoteDoc = searchData.item.result
               return (
                 <SearchModalNoteResultItem
-                  key={result.note._id}
-                  note={result.note}
+                  key={noteResult._id}
+                  note={noteResult}
                   selectedItemId={
-                    selectedNote != null && selectedNote._id == result.note._id
+                    selectedNote != null && selectedNote._id == noteResult._id
                       ? selectedItemId
                       : '-1'
                   }
-                  titleSearchResult={result.titleSearchResult}
-                  tagSearchResults={result.tagSearchResults}
-                  searchResults={result.results}
+                  titleSearchResult={searchData.titleSearchResult}
+                  tagSearchResults={searchData.tagSearchResults}
+                  searchResults={searchData.results}
                   updateSelectedItem={updateSelectedItems}
                   navigateToNote={navigateToNote}
                   navigateToEditorFocused={navFocusEditor}
@@ -378,7 +350,7 @@ const Container = styled.div<BaseTheme & TextAreaProps>`
   & > .container {
     position: relative;
     margin: 50px auto 0;
-    background-color: ${({ theme }) => theme.navBackgroundColor};
+    background-color: ${({ theme }) => theme.colors.background.primary};
     width: calc(100% - 15px);
     max-width: 720px;
     overflow: hidden;
@@ -398,7 +370,7 @@ const Container = styled.div<BaseTheme & TextAreaProps>`
         flex: 1;
         background-color: transparent;
         border: none;
-        color: ${({ theme }) => theme.uiTextColor};
+        color: ${({ theme }) => theme.colors.text.primary};
 
         resize: none;
         max-height: 4em;
@@ -412,12 +384,12 @@ const Container = styled.div<BaseTheme & TextAreaProps>`
       flex: 1;
       & > .searching {
         text-align: center;
-        color: ${({ theme }) => theme.disabledUiTextColor};
+        color: ${({ theme }) => theme.colors.text.disabled};
         padding: 10px;
       }
       & > .empty {
         text-align: center;
-        color: ${({ theme }) => theme.disabledUiTextColor};
+        color: ${({ theme }) => theme.colors.text.disabled};
         padding: 10px;
       }
       & > .item {
@@ -438,8 +410,8 @@ const Container = styled.div<BaseTheme & TextAreaProps>`
 const EditorPreview = styled.div`
   .marked {
     background-color: ${({ theme }) =>
-      theme.searchHighlightSubtleBackgroundColor};
-    color: ${({ theme }) => theme.searchHighlightTextColor} !important;
+      theme.codeEditorMarkedTextBackgroundColor};
+    color: #212121 !important;
     padding: 3px;
   }
 
@@ -449,10 +421,11 @@ const EditorPreview = styled.div`
   }
 
   .selected {
-    background-color: ${({ theme }) => theme.searchHighlightBackgroundColor};
+    background-color: ${({ theme }) =>
+      theme.codeEditorSelectedTextBackgroundColor};
   }
 
-  background-color: ${({ theme }) => theme.navBackgroundColor};
+  background-color: ${({ theme }) => theme.colors.background.primary};
 
   ${borderTop};
   width: 100%;
@@ -476,7 +449,7 @@ const EditorPreview = styled.div`
         flex: 1;
         ${textOverflow}
         &.empty {
-          color: ${({ theme }) => theme.disabledUiTextColor};
+          color: ${({ theme }) => theme.colors.text.disabled};
         }
       }
       & > .icon {
@@ -501,14 +474,14 @@ const EditorPreview = styled.div`
       cursor: pointer;
 
       transition: color 200ms ease-in-out;
-      color: ${({ theme }) => theme.navItemColor};
+      color: ${({ theme }) => theme.colors.text.secondary};
       &:hover {
-        color: ${({ theme }) => theme.navButtonHoverColor};
+        color: ${({ theme }) => theme.colors.text.subtle};
       }
 
       &:active,
       &.active {
-        color: ${({ theme }) => theme.navButtonActiveColor};
+        color: ${({ theme }) => theme.colors.text.link};
       }
     }
   }

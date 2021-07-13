@@ -1,18 +1,23 @@
 import React, { useState, useCallback } from 'react'
-import {
-  SectionIntroduction,
-  SectionFlexDualButtons,
-} from '../../organisms/settings/styled'
-import CustomButton from '../../atoms/buttons/CustomButton'
+import { SectionIntroduction } from '../../organisms/settings/styled'
 import { SerializedSubscription } from '../../../interfaces/db/subscription'
-import { StyledBillingInput } from '.'
-import { Spinner } from '../../atoms/Spinner'
 import { redeemPromo } from '../../../api/teams/subscription'
-import { useToast } from '../../../../lib/v2/stores/toast'
+import { useToast } from '../../../../shared/lib/stores/toast'
+import Button, {
+  LoadingButton,
+} from '../../../../shared/components/atoms/Button'
+import ButtonGroup from '../../../../shared/components/atoms/ButtonGroup'
+import Form from '../../../../shared/components/molecules/Form'
+import FormRow from '../../../../shared/components/molecules/Form/templates/FormRow'
+import styled from '../../../../shared/lib/styled'
+import Banner from '../../../../shared/components/atoms/Banner'
+import { mdiGiftOff } from '@mdi/js'
+import { lngKeys } from '../../../lib/i18n/types'
+import { useI18n } from '../../../lib/hooks/useI18n'
 
 interface UpdateBillingPromoFormProps {
   sub?: SerializedSubscription
-  onSuccess: () => void
+  onSuccess: (subscription: SerializedSubscription) => void
   onCancel: () => void
 }
 
@@ -24,6 +29,7 @@ const UpdateBillingPromoForm = ({
   const { pushApiErrorMessage, pushMessage } = useToast()
   const [sending, setSending] = useState<boolean>(false)
   const [promoCode, setPromoCode] = useState<string>('')
+  const { translate } = useI18n()
 
   const onSubmit = async (event: any) => {
     event.preventDefault()
@@ -33,13 +39,15 @@ const UpdateBillingPromoForm = ({
 
     try {
       setSending(true)
-      await redeemPromo(sub.teamId, { code: promoCode })
+      const { subscription } = await redeemPromo(sub.teamId, {
+        code: promoCode,
+      })
       pushMessage({
         title: 'Promo Code',
         description: `Applied promo code '${promoCode}' to your subscription`,
         type: 'success',
       })
-      onSuccess()
+      onSuccess(subscription)
     } catch (error) {
       if (error.response.status === 403) {
         pushMessage({
@@ -68,47 +76,63 @@ const UpdateBillingPromoForm = ({
       <div>
         <SectionIntroduction>
           <p>You need to have a valid subscription to perform this action.</p>
-          <SectionFlexDualButtons>
-            <CustomButton
-              onClick={onCancel}
-              variant='secondary'
-              disabled={sending}
-            >
-              Cancel
-            </CustomButton>
-          </SectionFlexDualButtons>
+          <Button onClick={onCancel} variant='secondary' disabled={sending}>
+            Cancel
+          </Button>
         </SectionIntroduction>
       </div>
     )
   }
 
   return (
-    <div>
-      <SectionIntroduction>
-        <p>Apply a promotion code</p>
-        <StyledBillingInput
-          style={{ marginTop: 0 }}
-          placeholder='Promo Code'
-          value={promoCode}
-          onChange={onPromoInputChangeHandler}
+    <Container>
+      {sub.couponId != null && (
+        <Banner variant='warning' iconPath={mdiGiftOff}>
+          {translate(lngKeys.BillingApplyPromoWarning)}
+        </Banner>
+      )}
+      <p>{translate(lngKeys.BillingApplyPromo)}</p>
+      <Form onSubmit={onSubmit} rows={[]}>
+        <FormRow
+          row={{
+            items: [
+              {
+                type: 'input',
+                props: {
+                  placeholder: translate(lngKeys.PromoCode),
+                  value: promoCode,
+                  onChange: onPromoInputChangeHandler,
+                },
+              },
+            ],
+          }}
         />
 
-        <SectionFlexDualButtons>
-          <CustomButton
-            onClick={onCancel}
-            variant='secondary'
-            disabled={sending}
-          >
-            Cancel
-          </CustomButton>
+        <ButtonGroup display='flex' layout='spread' className='button__group'>
+          <Button onClick={onCancel} variant='secondary' disabled={sending}>
+            {translate(lngKeys.GeneralCancel)}
+          </Button>
 
-          <CustomButton onClick={onSubmit} variant='primary' disabled={sending}>
-            {sending ? <Spinner /> : 'Apply'}
-          </CustomButton>
-        </SectionFlexDualButtons>
-      </SectionIntroduction>
-    </div>
+          <LoadingButton
+            onClick={onSubmit}
+            variant='primary'
+            disabled={sending}
+            spinning={sending}
+          >
+            {translate(lngKeys.GeneralApplyVerb)}
+          </LoadingButton>
+        </ButtonGroup>
+      </Form>
+    </Container>
   )
 }
+
+const Container = styled.div`
+  width: 100%;
+
+  .button__group {
+    margin-top: ${({ theme }) => theme.sizes.spaces.md}px;
+  }
+`
 
 export default UpdateBillingPromoForm

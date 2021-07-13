@@ -10,14 +10,11 @@ import {
 import ContextMenuItem from './ControlsContextMenuItem'
 import {
   StyledContextMenuContainer,
-  StyledFooter,
   Scrollable,
   StyledMenuItem,
-  StyledIcon,
 } from './styled'
 import ControlsContextMenuBackground from './ControlsContextMenuBackground'
 import { SerializedFolderWithBookmark } from '../../../../../interfaces/db/folder'
-import { getFormattedBoosthubDate } from '../../../../../lib/date'
 import { useEffectOnce } from 'react-use'
 import {
   useGlobalKeyDownHandler,
@@ -28,23 +25,28 @@ import {
 import { MetaKeyText } from '../../../../../lib/keyboard'
 import IconMdi from '../../../../atoms/IconMdi'
 import { mdiStar, mdiTrashCan, mdiStarOutline, mdiPencil } from '@mdi/js'
-import { useToast } from '../../../../../../lib/v2/stores/toast'
-import { useCloudUI } from '../../../../../../lib/v2/hooks/cloud/useCloudUI'
+import { useToast } from '../../../../../../shared/lib/stores/toast'
+import { useCloudResourceModals } from '../../../../../lib/hooks/useCloudResourceModals'
+import { useI18n } from '../../../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../../../lib/i18n/types'
 
 interface FolderContextMenuProps {
   currentFolder: SerializedFolderWithBookmark
   closeContextMenu: () => void
+  currentUserIsCoreMember: boolean
 }
 
 const FolderContextMenu = ({
   closeContextMenu,
   currentFolder,
+  currentUserIsCoreMember,
 }: FolderContextMenuProps) => {
   const [sendingBookmark, setSendingBookmark] = useState<boolean>(false)
   const { updateFoldersMap, deleteFolderHandler } = useNav()
   const { setPartialPageData } = usePage()
   const { pushMessage } = useToast()
-  const { openRenameFolderForm } = useCloudUI()
+  const { openRenameFolderForm } = useCloudResourceModals()
+  const { translate } = useI18n()
 
   const menuRef = React.createRef<HTMLDivElement>()
   useEffectOnce(() => {
@@ -118,25 +120,25 @@ const FolderContextMenu = ({
       <ControlsContextMenuBackground closeContextMenu={closeContextMenu} />
       <StyledContextMenuContainer ref={menuRef} onBlur={onBlurHandler}>
         <Scrollable>
-          <ContextMenuItem
-            label={
-              <div>
-                <StyledMenuItem>
-                  <StyledIcon>
-                    <IconMdi path={mdiPencil} />
-                  </StyledIcon>
-                  Rename
-                </StyledMenuItem>
-              </div>
-            }
-            disabled={sendingBookmark}
-            onClick={() => {
-              openRenameFolderForm(currentFolder)
-              closeContextMenu()
-            }}
-            id='fD-context-top-edit'
-            tooltip='E'
-          />
+          {currentUserIsCoreMember && (
+            <ContextMenuItem
+              label={
+                <div>
+                  <StyledMenuItem>
+                    <IconMdi className='icon' size={16} path={mdiPencil} />
+                    {translate(lngKeys.GeneralRenameVerb)}
+                  </StyledMenuItem>
+                </div>
+              }
+              disabled={sendingBookmark}
+              onClick={() => {
+                openRenameFolderForm(currentFolder)
+                closeContextMenu()
+              }}
+              id='fD-context-top-edit'
+              tooltip='E'
+            />
+          )}
           <ContextMenuItem
             label={
               sendingBookmark ? (
@@ -144,19 +146,15 @@ const FolderContextMenu = ({
               ) : currentFolder.bookmarked ? (
                 <div>
                   <StyledMenuItem>
-                    <StyledIcon>
-                      <IconMdi path={mdiStar} />
-                    </StyledIcon>
-                    Unbookmark
+                    <IconMdi className='icon' size={16} path={mdiStar} />
+                    {translate(lngKeys.GeneralUnbookmarkVerb)}
                   </StyledMenuItem>
                 </div>
               ) : (
                 <div>
                   <StyledMenuItem>
-                    <StyledIcon>
-                      <IconMdi path={mdiStarOutline} />
-                    </StyledIcon>
-                    Bookmark
+                    <IconMdi className='icon' size={16} path={mdiStarOutline} />
+                    {translate(lngKeys.GeneralBookmarkVerb)}
                   </StyledMenuItem>
                 </div>
               )
@@ -166,26 +164,22 @@ const FolderContextMenu = ({
             id='fD-context-top-bookmark'
             tooltip='B'
           />
-          <ContextMenuItem
-            label={
-              <div>
-                <StyledMenuItem>
-                  <StyledIcon>
-                    <IconMdi path={mdiTrashCan} />
-                  </StyledIcon>
-                  Delete
-                </StyledMenuItem>
-              </div>
-            }
-            onClick={() => deleteFolderHandler(currentFolder)}
-            id='fd-context-top-delete'
-            tooltip={`${MetaKeyText()} + Shift + Delete`}
-          />
+          {currentUserIsCoreMember && (
+            <ContextMenuItem
+              label={
+                <div>
+                  <StyledMenuItem>
+                    <IconMdi className='icon' size={16} path={mdiTrashCan} />
+                    {translate(lngKeys.GeneralDelete)}
+                  </StyledMenuItem>
+                </div>
+              }
+              onClick={() => deleteFolderHandler(currentFolder)}
+              id='fd-context-top-delete'
+              tooltip={`${MetaKeyText()} + Shift + Delete`}
+            />
+          )}
         </Scrollable>
-        <StyledFooter>
-          Last updated:
-          <div>{getFormattedBoosthubDate(currentFolder.updatedAt)}</div>
-        </StyledFooter>
       </StyledContextMenuContainer>
     </>
   )

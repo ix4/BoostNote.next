@@ -1,16 +1,11 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import {
-  Section,
-  SectionHeader2,
-  SectionRow,
-  SectionInput,
   SectionList,
   SectionListItem,
   SectionInLineIcon,
-  SectionSelect,
 } from '../organisms/settings/styled'
 import { SerializedTeamInvite } from '../../interfaces/db/teamInvite'
-import { useDialog, DialogIconTypes } from '../../../lib/v2/stores/dialog'
+import { useDialog, DialogIconTypes } from '../../../shared/lib/stores/dialog'
 import { usePage } from '../../lib/stores/pageStore'
 import { useEffectOnce } from 'react-use'
 import {
@@ -23,16 +18,25 @@ import IconMdi from '../atoms/IconMdi'
 import { mdiClose } from '@mdi/js'
 import { Spinner } from '../atoms/Spinner'
 import ErrorBlock from '../atoms/ErrorBlock'
-import CustomButton from '../atoms/buttons/CustomButton'
-import { SelectChangeEventHandler } from '../../lib/utils/events'
 import { SerializedUserTeamPermissions } from '../../interfaces/db/userTeamPermissions'
 import Flexbox from '../atoms/Flexbox'
+import Form from '../../../shared/components/molecules/Form'
+import { SerializedSubscription } from '../../interfaces/db/subscription'
+import FormRow from '../../../shared/components/molecules/Form/templates/FormRow'
+import FormRowItem from '../../../shared/components/molecules/Form/templates/FormRowItem'
+import { useI18n } from '../../lib/hooks/useI18n'
+import { lngKeys } from '../../lib/i18n/types'
+import { FormSelectOption } from '../../../shared/components/molecules/Form/atoms/FormSelect'
 
 interface TeamInvitesSectionProps {
   userPermissions: SerializedUserTeamPermissions
+  subscription?: SerializedSubscription
 }
 
-const TeamInvitesSection = ({ userPermissions }: TeamInvitesSectionProps) => {
+const TeamInvitesSection = ({
+  userPermissions,
+  subscription,
+}: TeamInvitesSectionProps) => {
   const { team } = usePage()
   const [sending, setSending] = useState<boolean>(true)
   const [pendingInvites, setPendingInvites] = useState<SerializedTeamInvite[]>(
@@ -41,7 +45,18 @@ const TeamInvitesSection = ({ userPermissions }: TeamInvitesSectionProps) => {
   const [email, setEmail] = useState<string>('')
   const [error, setError] = useState<unknown>()
   const { messageBox } = useDialog()
-  const [role, setRole] = useState<TeamPermissionType>('member')
+  const [role, setRole] = useState<TeamPermissionType>(
+    userPermissions.role === 'viewer' ? 'viewer' : 'member'
+  )
+  const mountedRef = useRef(false)
+  const { translate, getRoleLabel } = useI18n()
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffectOnce(() => {
     fetchAndSetInvites()
@@ -52,13 +67,25 @@ const TeamInvitesSection = ({ userPermissions }: TeamInvitesSectionProps) => {
       return
     }
     setSending(true)
-    try {
-      const { invites } = await getTeamInvites(team)
-      setPendingInvites(invites)
-    } catch (error) {
-      setError(error)
-    }
-    setSending(false)
+    getTeamInvites(team)
+      .then(({ invites }) => {
+        if (!mountedRef.current) {
+          return
+        }
+        setPendingInvites(invites)
+      })
+      .catch((error) => {
+        if (!mountedRef.current) {
+          return
+        }
+        setError(error)
+      })
+      .finally(() => {
+        if (!mountedRef.current) {
+          return
+        }
+        setSending(false)
+      })
   }, [team])
 
   const onChangeHandler = useCallback(
@@ -98,8 +125,8 @@ const TeamInvitesSection = ({ userPermissions }: TeamInvitesSectionProps) => {
       }
 
       messageBox({
-        title: `Cancel?`,
-        message: `Are you sure to retract this invite? The user won't be able to join the team anymore.`,
+        title: translate(lngKeys.CancelInvite),
+        message: translate(lngKeys.CancelInviteEmailMessage),
         iconType: DialogIconTypes.Warning,
         buttons: [
           {
@@ -129,71 +156,110 @@ const TeamInvitesSection = ({ userPermissions }: TeamInvitesSectionProps) => {
         ],
       })
     },
-    [messageBox, team]
+    [messageBox, team, translate]
   )
 
-  const selectRole: SelectChangeEventHandler = useCallback(
-    (event) => {
+  const selectRole = useCallback(
+    (option: FormSelectOption) => {
       if (userPermissions.role !== 'admin') {
         return
       }
 
-      setRole(event.target.value as TeamPermissionType)
+      setRole(option.value as TeamPermissionType)
     },
     [setRole, userPermissions]
   )
 
+  const selectRoleOptions = useMemo(() => {
+    let roles: FormSelectOption[] = []
+    switch (userPermissions.role) {
+      case 'admin':
+        roles = [
+          { label: translate(lngKeys.GeneralAdmin), value: 'admin' },
+          { label: translate(lngKeys.GeneralMember), value: 'member' },
+        ]
+        break
+      case 'member':
+        roles = [{ label: translate(lngKeys.GeneralMember), value: 'member' }]
+        break
+      case 'viewer':
+      default:
+        break
+    }
+
+    if (subscription != null) {
+      roles.push({ label: translate(lngKeys.GeneralViewer), value: 'viewer' })
+    }
+    return roles
+  }, [userPermissions.role, subscription, translate])
+
   return (
-    <Section>
+    <section>
       <Flexbox>
-        <SectionHeader2>Invite with Email</SectionHeader2>
+        <h2>{translate(lngKeys.InviteEmail)}</h2>
         {sending && <Spinner className='relative' style={{ top: 2 }} />}
       </Flexbox>
-      <form onSubmit={submitInvite}>
-        <SectionRow>
-          <SectionInput
-            value={email}
-            onChange={onChangeHandler}
-            placeholder='Email...'
+      <Form onSubmit={submitInvite}>
+        <FormRow fullWidth={true}>
+          <FormRowItem
+            item={{
+              type: 'input',
+              props: {
+                value: email,
+                onChange: onChangeHandler,
+                placeholder: 'Email...',
+              },
+            }}
           />
-          <SectionSelect
-            value={role}
-            onChange={selectRole}
-            style={{ width: 'auto', minWidth: 'initial', marginRight: 16 }}
-            disabled={userPermissions.role !== 'admin'}
-          >
-            <option value='admin'>admin</option>
-            <option value='member'>member</option>
-          </SectionSelect>
-          <CustomButton type='submit' variant='primary'>
-            Send
-          </CustomButton>
-        </SectionRow>
-      </form>
+          <FormRowItem
+            flex='0 0 150px'
+            item={{
+              type: 'select',
+              props: {
+                value: { label: getRoleLabel(role), value: role },
+                onChange: selectRole,
+                options: selectRoleOptions,
+              },
+            }}
+          />
+          <FormRowItem
+            flex='0 0 100px !important'
+            item={{
+              type: 'button',
+              props: {
+                type: 'submit',
+                label: translate(lngKeys.GeneralSendVerb),
+                disabled: sending,
+              },
+            }}
+          />
+        </FormRow>
+      </Form>
       {role === 'admin' ? (
-        <small>
-          Admins can handle billing, remove or promote/demote members.
-        </small>
+        <small>{translate(lngKeys.RoleAdminDescription)}</small>
+      ) : role === 'member' ? (
+        <small>{translate(lngKeys.RoleMemberDescription)}</small>
       ) : (
-        <small>
-          Members can access all features, except team management, billing.
-        </small>
+        <small>{translate(lngKeys.RoleViewerDescription)}</small>
       )}
       <SectionList>
         {pendingInvites.map((invite) => (
           <SectionListItem key={invite.id} className='li'>
             <label>{invite.email}</label>
             <div>
-              {invite.role}{' '}
-              <SectionInLineIcon onClick={() => cancelInvite(invite)}>
-                <IconMdi path={mdiClose} />
-              </SectionInLineIcon>
+              {getRoleLabel(invite.role as TeamPermissionType)}{' '}
+              {(invite.role === userPermissions.role ||
+                userPermissions.role !== 'viewer') && (
+                <SectionInLineIcon onClick={() => cancelInvite(invite)}>
+                  <IconMdi path={mdiClose} />
+                </SectionInLineIcon>
+              )}
             </div>
           </SectionListItem>
         ))}
       </SectionList>
       {error != null && <ErrorBlock error={error} />}
-    </Section>
+    </section>
   )
 }
 

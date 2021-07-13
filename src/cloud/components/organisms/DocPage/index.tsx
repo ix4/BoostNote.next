@@ -28,6 +28,7 @@ interface DocPageProps {
   contributors: SerializedUser[]
   backLinks: SerializedDoc[]
   revisionHistory: SerializedRevision[]
+  thread?: string
 }
 
 const DocPage = ({
@@ -36,7 +37,13 @@ const DocPage = ({
   backLinks,
   revisionHistory,
 }: DocPageProps) => {
-  const { team, subscription, permissions = [] } = usePage()
+  const {
+    team,
+    subscription,
+    permissions = [],
+    currentUserPermissions,
+    currentUserIsCoreMember,
+  } = usePage()
   const { docsMap, setCurrentPath, deleteDocHandler } = useNav()
   const {
     globalData: { currentUser },
@@ -75,20 +82,30 @@ const DocPage = ({
   }, [currentDoc, setCurrentPath])
 
   const docIsEditable = useMemo(() => {
+    if (
+      currentUserPermissions == null ||
+      currentUserPermissions.role === 'viewer'
+    ) {
+      return false
+    }
+
     if (subscription == null) {
       return true
     }
 
-    if (subscription.seats >= permissions.length) {
+    if (
+      subscription.seats >=
+      permissions.filter((p) => p.role !== 'viewer').length
+    ) {
       return true
     }
 
     return false
-  }, [subscription, permissions])
+  }, [subscription, permissions, currentUserPermissions])
 
   const docPageControlsKeyDownHandler = useMemo(() => {
     return (event: KeyboardEvent) => {
-      if (currentDoc == null) {
+      if (currentDoc == null || !currentUserIsCoreMember) {
         return
       }
       if (isDocDeleteShortcut(event) && currentDoc.archivedAt != null) {
@@ -106,7 +123,14 @@ const DocPage = ({
         router.push(getDocLinkHref(currentDoc, team, 'index'))
       }
     }
-  }, [deleteDocHandler, currentDoc, docIsEditable, router, team])
+  }, [
+    deleteDocHandler,
+    currentDoc,
+    docIsEditable,
+    router,
+    team,
+    currentUserIsCoreMember,
+  ])
   useGlobalKeyDownHandler(docPageControlsKeyDownHandler)
 
   if (currentDoc == null || team == null) {
@@ -120,9 +144,18 @@ const DocPage = ({
     )
   }
 
-  return docIsEditable &&
-    currentDoc.archivedAt == null &&
-    currentUser != null ? (
+  if (currentUser == null) {
+    return (
+      <Application content={{}}>
+        <ColoredBlock variant='danger' style={{ marginTop: '100px' }}>
+          <h3>Oops...</h3>
+          <p>You need to be connected to access this document.</p>
+        </ColoredBlock>
+      </Application>
+    )
+  }
+
+  return docIsEditable ? (
     <EditPage
       team={team}
       doc={currentDoc}
@@ -138,6 +171,8 @@ const DocPage = ({
       editable={docIsEditable}
       contributors={contributors}
       backLinks={currentBacklinks}
+      user={currentUser}
+      revisionHistory={revisionHistory}
     />
   )
 }

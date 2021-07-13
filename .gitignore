@@ -1,7 +1,11 @@
 node_modules/*
 .DS_Store
 .env
+.env.dev
+.env.local
 .env.staging
+.env.production
+.env.local
 Desktop.ini
 Thumbs.db
 *.log

@@ -7,23 +7,17 @@ import { useRouter } from '../../lib/router'
 import { GeneralStatus, useGeneralStatus } from '../../lib/generalStatus'
 import CloudWorkspaceSelect from '../molecules/CloudWorkspaceSelect'
 import Flexbox from '../../cloud/components/atoms/Flexbox'
-import Icon from '../atoms/Icon'
 import { mdiAlert, mdiCheckCircle, mdiTea } from '@mdi/js'
 import ProgressBar from '../atoms/ProgressBar'
 import { usePreferences } from '../../lib/preferences'
-import {
-  FormSelect,
-  FormPrimaryButton,
-  FormSecondaryButton,
-  FormHeading,
-  FormTransparentButton,
-  FormGroup,
-} from '../atoms/form'
+import { FormSelect, FormHeading, FormGroup } from '../atoms/form'
 import Alert from '../atoms/Alert'
 import { useMigrations, MigrationInfo } from '../../lib/migrate/store'
 import plur from 'plur'
 import { useStorageRouter } from '../../lib/storageRouter'
-import styled from '../../lib/styled'
+import Icon from '../../shared/components/atoms/Icon'
+import styled from '../../shared/lib/styled'
+import Button from '../../shared/components/atoms/Button'
 
 interface MigrationPageProps {
   storage: NoteStorage
@@ -116,14 +110,15 @@ const MigrationPage = ({ storage }: MigrationPageProps) => {
     return (
       <div>
         <p>You must have a cloud account to migrate data</p>
-        <FormPrimaryButton
+        <Button
+          variant={'primary'}
           onClick={() => {
             push('/app/boosthub/login')
             setClosed(true)
           }}
         >
           Create Team Account
-        </FormPrimaryButton>
+        </Button>
       </div>
     )
   }
@@ -152,7 +147,7 @@ const MigrationPage = ({ storage }: MigrationPageProps) => {
             </FormSelect>
           </Flexbox>
           <Flexbox justifyContent='space-between'>
-            <p>Workspace</p>
+            <p>Folder</p>
             <div>
               <CloudWorkspaceSelect
                 onChange={selectWorkspace}
@@ -164,15 +159,16 @@ const MigrationPage = ({ storage }: MigrationPageProps) => {
           </Flexbox>
         </FormGroup>
         <Flexbox justifyContent='flex-end'>
-          <FormTransparentButton onClick={() => openTab('storage')}>
+          <Button variant={'transparent'} onClick={() => openTab('storage')}>
             Cancel
-          </FormTransparentButton>
-          <FormPrimaryButton
+          </Button>
+          <Button
+            variant={'primary'}
             onClick={pinDestination}
             disabled={migrationState.workspace == null}
           >
             Next
-          </FormPrimaryButton>
+          </Button>
         </Flexbox>
       </div>
     )
@@ -186,9 +182,9 @@ const MigrationPage = ({ storage }: MigrationPageProps) => {
           <FormHeading depth={2}>⚠️ Notice</FormHeading>
           <ol>
             <li>
-              There are many advanced features like guest invitation for Cloud
-              space Pro plan. Please see pricing table. You can try the Pro plan
-              free for two weeks.
+              There are many advanced features like viewers invitation for Cloud
+              space Pro plan. Please see pricing table. A two weeks long free
+              trial for the Pro plan is also available.
             </li>
             <li>
               This operation does not account for already migrated documents.
@@ -199,13 +195,19 @@ const MigrationPage = ({ storage }: MigrationPageProps) => {
               space. Please delete this space manually once migration has
               completed.
             </li>
+            <li>
+              After migration, you will receive an 1 month free trial coupon for
+              the cloud space.
+            </li>
           </ol>
         </Alert>
         <Flexbox justifyContent='flex-end'>
-          <FormTransparentButton onClick={cancel}>Cancel</FormTransparentButton>
-          <FormPrimaryButton onClick={runMigration}>
+          <Button variant={'transparent'} onClick={cancel}>
+            Cancel
+          </Button>
+          <Button variant={'primary'} onClick={runMigration}>
             Start migration
-          </FormPrimaryButton>
+          </Button>
         </Flexbox>
       </div>
     )
@@ -216,7 +218,7 @@ const MigrationPage = ({ storage }: MigrationPageProps) => {
       <div>
         <FormHeading>2. Migrating</FormHeading>
         <Flexbox justifyContent='center' direction='column'>
-          <Icon path={mdiTea} size={42} />
+          <Icon path={mdiTea} size={50} />
           <h3>Migration is processing...</h3>
           <p>
             This may take a while. Feel free to have a cup of tea while waiting.
@@ -235,7 +237,9 @@ const MigrationPage = ({ storage }: MigrationPageProps) => {
           />
         </Flexbox>
         <Flexbox justifyContent='flex-end'>
-          <FormTransparentButton onClick={cancel}>Cancel</FormTransparentButton>
+          <Button variant={'transparent'} onClick={cancel}>
+            Cancel
+          </Button>
         </Flexbox>
       </div>
     )
@@ -251,7 +255,9 @@ const MigrationPage = ({ storage }: MigrationPageProps) => {
           <p>{migrationState.err.toString()}</p>
         </div>
         <Flexbox justifyContent='flex-end'>
-          <FormSecondaryButton onClick={cancel}>Retry</FormSecondaryButton>
+          <Button variant={'secondary'} onClick={cancel}>
+            Retry
+          </Button>
         </Flexbox>
       </div>
     )
@@ -272,12 +278,15 @@ const MigrationPage = ({ storage }: MigrationPageProps) => {
         direction='column'
       >
         <Flexbox justifyContent='center' alignItems='center' direction='column'>
-          <Icon size={42} path={mdiCheckCircle} />
+          <Icon size={50} path={mdiCheckCircle} />
           <h3>Migration has completed!</h3>
         </Flexbox>
         <p>
           Close settings modal and switch account via the left tab to the cloud
           space.
+          <br />
+          You&apos;ll receive an email containing the coupon code and
+          instructions on how to redeem it.
           <br />
           We hope you enjoy using it!
         </p>
@@ -331,7 +340,9 @@ const MigrationPage = ({ storage }: MigrationPageProps) => {
         ) : null}
 
         <Flexbox justifyContent='center'>
-          <FormPrimaryButton onClick={finish}>Finish</FormPrimaryButton>
+          <Button variant={'primary'} onClick={finish}>
+            Finish
+          </Button>
         </Flexbox>
       </Flexbox>
     </StyledMigrationScreen>

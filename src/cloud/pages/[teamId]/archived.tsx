@@ -9,11 +9,11 @@ import { useRouter } from '../../lib/router'
 import Application from '../../components/Application'
 import { getTeamLinkHref } from '../../components/atoms/Link/TeamLink'
 import ContentManager from '../../components/molecules/ContentManager'
-import { topParentId } from '../../../lib/v2/mappers/cloud/topbarTree'
+import { topParentId } from '../../lib/mappers/topbarTree'
 import EmojiIcon from '../../components/atoms/EmojiIcon'
 
 const ArchivedPage = () => {
-  const { team } = usePage()
+  const { team, currentUserIsCoreMember } = usePage()
   const { docsMap, workspacesMap } = useNav()
   const { push } = useRouter()
 
@@ -64,6 +64,8 @@ const ArchivedPage = () => {
         folders={[]}
         page='archive'
         workspacesMap={workspacesMap}
+        showCreateButtons={false}
+        currentUserIsCoreMember={currentUserIsCoreMember}
       />
     </Application>
   )

@@ -1,9 +1,10 @@
+import { Dispatch, SetStateAction } from 'react'
 import { HistoryItem } from '../../../api/search'
 
 export interface SearchContext {
+  showSearchScreen: boolean
+  setShowSearchScreen: Dispatch<SetStateAction<boolean>>
   history: HistoryItem[]
   searchHistory: string[]
-  showGlobalSearch: boolean
-  setShowGlobalSearch: (val: boolean) => void
   addToSearchHistory: (val: string) => void
 }

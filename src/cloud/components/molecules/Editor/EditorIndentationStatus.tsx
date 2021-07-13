@@ -19,6 +19,8 @@ import { selectStyle } from '../../../lib/styled/styleFunctions'
 import { isChildNode } from '../../../lib/dom'
 import { trackEvent } from '../../../api/track'
 import { MixpanelActionTrackTypes } from '../../../interfaces/analytics/mixpanel'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
 
 const EditorIndentationStatus = () => {
   const { settings, setSettings } = useSettings()
@@ -26,6 +28,7 @@ const EditorIndentationStatus = () => {
   const currentIndentSize = settings['general.editorIndentSize']
   const [showingIndentMenu, setShowingIndentMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const { translate } = useI18n()
 
   const showIndentMenu: MouseEventHandler<HTMLButtonElement> = useCallback(() => {
     setShowingIndentMenu(true)
@@ -82,7 +85,12 @@ const EditorIndentationStatus = () => {
   return (
     <StyledContainer>
       <BottomBarButton onClick={showIndentMenu}>
-        {capitalize(currentIndentType)}: {currentIndentSize}
+        {capitalize(
+          currentIndentType === 'spaces'
+            ? translate(lngKeys.GeneralSpaces)
+            : translate(lngKeys.GeneralTabs)
+        )}
+        : {currentIndentSize}
       </BottomBarButton>
       {showingIndentMenu && (
         <div
@@ -93,7 +101,7 @@ const EditorIndentationStatus = () => {
         >
           <div className='menu__item'>
             <label className='menu__item__label' htmlFor='indentTypeSelect'>
-              Indent Type
+              {translate(lngKeys.SettingsIndentType)}
             </label>
             <select
               onChange={selectIndentType}
@@ -101,13 +109,13 @@ const EditorIndentationStatus = () => {
               className='menu__item__select'
               value={currentIndentType}
             >
-              <option value='spaces'>Spaces</option>
-              <option value='tab'>Tab</option>
+              <option value='spaces'>{translate(lngKeys.GeneralSpaces)}</option>
+              <option value='tab'>{translate(lngKeys.GeneralTabs)}</option>
             </select>
           </div>
           <div className='menu__item'>
             <label className='menu__item__label' htmlFor='indentSizeSelect'>
-              Indent Size
+              {translate(lngKeys.SettingsIndentSize)}
             </label>
             <select
               onChange={selectIndentSize}
@@ -151,7 +159,7 @@ const StyledContainer = styled.div`
   .menu__item__label {
     overflow: nowrap;
     display: block;
-    font-size: ${({ theme }) => theme.space.xxsmall}px;
+    font-size: ${({ theme }) => theme.fontSizes.small}px;
     margin-bottom: 0;
   }
   .menu__item__select {

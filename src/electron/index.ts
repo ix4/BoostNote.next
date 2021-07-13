@@ -2,13 +2,15 @@ import {
   app,
   BrowserWindow,
   BrowserWindowConstructorOptions,
+  ipcMain,
   Menu,
+  MenuItemConstructorOptions,
   protocol,
   session,
 } from 'electron'
 import path from 'path'
 import url from 'url'
-import { template } from './menu'
+import { getTemplateFromKeymap } from './menu'
 import { dev } from './consts'
 
 // global reference to mainWindow (necessary to prevent window from being garbage collected)
@@ -17,6 +19,18 @@ const MAC = process.platform === 'darwin'
 
 // single instance lock
 const singleInstance = app.requestSingleInstanceLock()
+
+const keymap = new Map<string, string>([
+  ['toggleGlobalSearch', 'Ctrl + P'],
+  ['toggleSplitEditMode', 'Ctrl + \\'],
+  ['togglePreviewMode', 'Ctrl + E'],
+  ['editorSaveAs', 'Ctrl + S'],
+])
+
+function applyMenuTemplate(template: MenuItemConstructorOptions[]) {
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+}
 
 function createMainWindow() {
   const windowOptions: BrowserWindowConstructorOptions = {
@@ -52,8 +66,7 @@ function createMainWindow() {
     )
   }
 
-  const menu = Menu.buildFromTemplate(template)
-  Menu.setApplicationMenu(menu)
+  applyMenuTemplate(getTemplateFromKeymap(keymap))
 
   if (MAC) {
     window.on('close', (event) => {
@@ -127,6 +140,17 @@ app.on('ready', () => {
     callback(pathname)
   })
   mainWindow = createMainWindow()
+
+  ipcMain.on('menuAcceleratorChanged', (_, args) => {
+    if (args.length != 2) {
+      return
+    }
+    const menuItemId = args[0]
+    const newAcceleratorShortcut = args[1] == null ? undefined : args[1]
+
+    keymap.set(menuItemId, newAcceleratorShortcut)
+    applyMenuTemplate(getTemplateFromKeymap(keymap))
+  })
 
   app.on('open-url', (_event, url) => {
     mainWindow!.webContents.send('open-boostnote-url', url)

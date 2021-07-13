@@ -1,19 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import Router from './Router'
-import GlobalStyle from './GlobalStyle'
 import { ThemeProvider } from 'styled-components'
-import { selectTheme } from '../themes'
-import Dialog from './organisms/Dialog'
 import { useDb } from '../lib/db'
 import PreferencesModal from './PreferencesModal/PreferencesModal'
 import { usePreferences } from '../lib/preferences'
 import '../lib/i18n'
 import '../lib/analytics'
 import CodeMirrorStyle from './CodeMirrorStyle'
-import ToastList from './Toast'
-import styled from '../lib/styled'
 import { useEffectOnce } from 'react-use'
-import AppNavigator from './organisms/AppNavigator'
 import { useRouter } from '../lib/router'
 import { values, keys } from '../lib/db/utils'
 import {
@@ -42,14 +36,24 @@ import {
   boostHubToggleSettingsEventEmitter,
   boostHubLoginRequestEventEmitter,
   boostHubCreateLocalSpaceEventEmitter,
+  BoostHubSubscriptionDeleteEvent,
+  boostHubSubscriptionDeleteEventEmitter,
+  boostHubSubscriptionUpdateEventEmitter,
 } from '../lib/events'
 import { useRouteParams } from '../lib/routeParams'
-import { useCreateWorkspaceModal } from '../lib/createWorkspaceModal'
-import CreateWorkspaceModal from './organisms/CreateWorkspaceModal'
 import { useStorageRouter } from '../lib/storageRouter'
 import ExternalStyle from './ExternalStyle'
-import { useDialog, DialogIconTypes } from '../lib/dialog'
-import { selectV2Theme } from '../lib/v2/styled/styleFunctions'
+import { selectV2Theme } from '../shared/lib/styled/styleFunctions'
+import Modal from '../shared/components/organisms/Modal'
+import GlobalStyle from '../shared/components/atoms/GlobalStyle'
+import { DialogIconTypes, useDialog } from '../shared/lib/stores/dialog'
+import Dialog from '../shared/components/organisms/Dialog/Dialog'
+import ContextMenu from '../shared/components/molecules/ContextMenu'
+import { useCloudIntroModal } from '../lib/cloudIntroModal'
+import CloudIntroModal from './organisms/CloudIntroModal'
+import AppNavigator from './organisms/AppNavigator'
+import Toast from '../shared/components/organisms/Toast'
+import styled from '../shared/lib/styled'
 
 const LoadingText = styled.div`
   margin: 30px;
@@ -116,25 +120,31 @@ const App = () => {
         messageBox({
           title: 'Sign In',
           message: 'Your cloud access token has been expired.',
-          buttons: ['Sign In Again', 'Cancel'],
-          defaultButtonIndex: 0,
+          buttons: [
+            {
+              label: 'Sign In Again',
+              defaultButton: true,
+              onClick: () => {
+                push(`/app/boosthub/login`)
+                setTimeout(() => {
+                  boostHubLoginRequestEventEmitter.dispatch()
+                }, 1000)
+              },
+            },
+            {
+              label: 'Cancel',
+              cancelButton: true,
+              onClick: () => {
+                setPreferences({
+                  'cloud.user': undefined,
+                })
+                setGeneralStatus({
+                  boostHubTeams: [],
+                })
+              },
+            },
+          ],
           iconType: DialogIconTypes.Warning,
-          onClose: (value: number | null) => {
-            if (value === 0) {
-              push(`/app/boosthub/login`)
-              setTimeout(() => {
-                boostHubLoginRequestEventEmitter.dispatch()
-              }, 1000)
-              return
-            }
-
-            setPreferences({
-              'cloud.user': undefined,
-            })
-            setGeneralStatus({
-              boostHubTeams: [],
-            })
-          },
         })
         return
       }
@@ -153,6 +163,9 @@ const App = () => {
             id: team.id,
             name: team.name,
             domain: team.domain,
+            createdAt: team.createdAt,
+            subscription: team.subscription,
+            personal: team.personal,
             iconUrl:
               team.icon != null
                 ? getBoostHubTeamIconUrl(team.icon.location)
@@ -295,6 +308,46 @@ const App = () => {
       })
     }
 
+    const boostHubSubscriptioUpdateEventHandler = (
+      event: BoostHubSubscriptionDeleteEvent
+    ) => {
+      const updatedSub = event.detail.subscription
+      setGeneralStatus((previousGeneralStatus) => {
+        const teamMap =
+          previousGeneralStatus.boostHubTeams!.reduce((map, team) => {
+            if (updatedSub.teamId === team.id) {
+              map.set(team.id, { ...team, subscription: updatedSub })
+              return map
+            }
+            map.set(team.id, team)
+            return map
+          }, new Map()) || new Map()
+        return {
+          boostHubTeams: [...teamMap.values()],
+        }
+      })
+    }
+
+    const boostHubSubscriptionDeleteEventHandler = (
+      event: BoostHubSubscriptionDeleteEvent
+    ) => {
+      const deletedSub = event.detail.subscription
+      setGeneralStatus((previousGeneralStatus) => {
+        const teamMap =
+          previousGeneralStatus.boostHubTeams!.reduce((map, team) => {
+            if (deletedSub.teamId === team.id) {
+              map.set(team.id, { ...team, subscription: undefined })
+              return map
+            }
+            map.set(team.id, team)
+            return map
+          }, new Map()) || new Map()
+        return {
+          boostHubTeams: [...teamMap.values()],
+        }
+      })
+    }
+
     const boostHubAccountDeleteEventHandler = () => {
       push(`/app`)
       setPreferences({
@@ -309,6 +362,12 @@ const App = () => {
       push(`/app/storages`)
     }
 
+    boostHubSubscriptionDeleteEventEmitter.listen(
+      boostHubSubscriptionDeleteEventHandler
+    )
+    boostHubSubscriptionUpdateEventEmitter.listen(
+      boostHubSubscriptioUpdateEventHandler
+    )
     boostHubTeamCreateEventEmitter.listen(boostHubTeamCreateEventHandler)
     boostHubTeamUpdateEventEmitter.listen(boostHubTeamUpdateEventHandler)
     boostHubTeamDeleteEventEmitter.listen(boostHubTeamDeleteEventHandler)
@@ -317,6 +376,12 @@ const App = () => {
       boostHubCreateLocalSpaceEventHandler
     )
     return () => {
+      boostHubSubscriptionDeleteEventEmitter.unlisten(
+        boostHubSubscriptionDeleteEventHandler
+      )
+      boostHubSubscriptionUpdateEventEmitter.unlisten(
+        boostHubSubscriptioUpdateEventHandler
+      )
       boostHubTeamCreateEventEmitter.unlisten(boostHubTeamCreateEventHandler)
       boostHubTeamUpdateEventEmitter.unlisten(boostHubTeamUpdateEventHandler)
       boostHubTeamDeleteEventEmitter.unlisten(boostHubTeamDeleteEventHandler)
@@ -357,40 +422,52 @@ const App = () => {
 
   useBoostNoteProtocol()
 
-  const {
-    showCreateWorkspaceModal,
-    toggleShowCreateWorkspaceModal,
-  } = useCreateWorkspaceModal()
+  const { showingCloudIntroModal } = useCloudIntroModal()
+
+  const activeBoostHubTeamDomain = useMemo<string | null>(() => {
+    if (routeParams.name !== 'boosthub.teams.show') {
+      return null
+    }
+    return routeParams.domain
+  }, [routeParams])
+
+  const showingAppNavigator =
+    activeBoostHubTeamDomain != null
+      ? generalStatus.boostHubTeams.find(
+          (team) => team.domain === activeBoostHubTeamDomain
+        ) != null
+      : routeParams.name == 'boosthub.teams.create'
 
   return (
-    <ThemeProvider theme={selectTheme(preferences['general.theme'])}>
-      <ThemeProvider theme={selectV2Theme(preferences['general.theme'] as any)}>
-        <AppContainer
-          onDrop={(event: React.DragEvent) => {
-            event.preventDefault()
-          }}
-        >
-          {initialized ? (
-            <>
+    <ThemeProvider theme={selectV2Theme(preferences['general.theme'] as any)}>
+      <AppContainer
+        onDrop={(event: React.DragEvent) => {
+          event.preventDefault()
+        }}
+      >
+        {initialized ? (
+          <>
+            {showingAppNavigator != null ? (
               <AppNavigator />
-              <Router />
-              {showCreateWorkspaceModal && (
-                <CreateWorkspaceModal
-                  closeModal={toggleShowCreateWorkspaceModal}
-                />
-              )}
-            </>
-          ) : (
-            <LoadingText>Loading Data...</LoadingText>
-          )}
-          <GlobalStyle />
-          <Dialog />
-          <PreferencesModal />
-          <ToastList />
-          <CodeMirrorStyle />
-          <ExternalStyle />
-        </AppContainer>
-      </ThemeProvider>
+            ) : (
+              showingCloudIntroModal && <CloudIntroModal />
+            )}
+            <Router />
+          </>
+        ) : (
+          <LoadingText>Loading Data...</LoadingText>
+        )}
+        <GlobalStyle />
+        <CodeMirrorStyle />
+        <ExternalStyle />
+
+        <Toast />
+        <PreferencesModal />
+        <ContextMenu />
+
+        <Dialog />
+        <Modal />
+      </AppContainer>
     </ThemeProvider>
   )
 }

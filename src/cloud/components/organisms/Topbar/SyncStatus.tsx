@@ -64,7 +64,6 @@ const StyledSyncTextContainer = styled.div`
     align-items: center;
     font-size: ${({ theme }) => theme.fontSizes.small}px;
     color: ${({ theme }) => theme.dangerTextColor};
-
     > div {
       margin-left: ${({ theme }) => theme.space.xsmall}px;
     }

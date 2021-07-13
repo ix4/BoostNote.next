@@ -32,6 +32,13 @@ button {
   outline: none;
 }
 
+select,
+button {
+  &:hover {
+    cursor: pointer;
+  }
+}
+
 input {
   font-size: ${theme.fontSizes.default}px;
 }
@@ -90,6 +97,13 @@ export default createGlobalStyle<BaseTheme>`
     margin: 0;
     border: 0;
     outline: none;
+  }
+
+  select,
+  button {
+    &:hover {
+      cursor: pointer;
+    }
   }
 
   input {

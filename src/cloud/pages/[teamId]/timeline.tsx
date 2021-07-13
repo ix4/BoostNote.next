@@ -18,9 +18,12 @@ import { buildIconUrl } from '../../api/files'
 import { SerializedUser } from '../../interfaces/db/user'
 import { getColorFromString } from '../../lib/utils/string'
 import { GetInitialPropsParameters } from '../../interfaces/pages'
-import { topParentId } from '../../../lib/v2/mappers/cloud/topbarTree'
 import { useRouter } from '../../lib/router'
 import EmojiIcon from '../../components/atoms/EmojiIcon'
+import { topParentId } from '../../lib/mappers/topbarTree'
+import { useNav } from '../../lib/stores/nav'
+import { useI18n } from '../../lib/hooks/useI18n'
+import { lngKeys } from '../../lib/i18n/types'
 
 export interface TimelineUser {
   user: SerializedUser
@@ -31,6 +34,8 @@ export interface TimelineUser {
 const TimelinePage = ({ team, events }: TimelinePageData) => {
   const { push } = useRouter()
   const { permissions = [] } = usePage()
+  const { workspacesMap } = useNav()
+  const { translate } = useI18n()
 
   const { today, thisWeek, others } = useMemo(() => {
     const todayDate = new Date()
@@ -79,7 +84,7 @@ const TimelinePage = ({ team, events }: TimelinePageData) => {
           topbar: {
             breadcrumbs: [
               {
-                label: 'Timeline',
+                label: translate(lngKeys.GeneralTimeline),
                 active: true,
                 parentId: topParentId,
                 icon: mdiClockOutline,
@@ -97,7 +102,9 @@ const TimelinePage = ({ team, events }: TimelinePageData) => {
                 style={{ marginRight: 10 }}
                 size={16}
               />
-              <span style={{ marginRight: 10 }}>Timeline</span>
+              <span style={{ marginRight: 10 }}>
+                {translate(lngKeys.GeneralTimeline)}
+              </span>
             </>
           ),
         }}
@@ -117,11 +124,10 @@ const TimelinePage = ({ team, events }: TimelinePageData) => {
       <LazyDefaultLayout>
         <Application
           content={{
-            reduced: true,
             topbar: {
               breadcrumbs: [
                 {
-                  label: 'Timeline',
+                  label: translate(lngKeys.GeneralTimeline),
                   active: true,
                   parentId: topParentId,
                   icon: mdiClockOutline,
@@ -132,16 +138,6 @@ const TimelinePage = ({ team, events }: TimelinePageData) => {
                 },
               ],
             },
-            header: (
-              <>
-                <EmojiIcon
-                  defaultIcon={mdiClockOutline}
-                  style={{ marginRight: 10 }}
-                  size={16}
-                />
-                <span style={{ marginRight: 10 }}>Timeline</span>
-              </>
-            ),
           }}
         >
           <StyledTimelinePage>
@@ -152,6 +148,7 @@ const TimelinePage = ({ team, events }: TimelinePageData) => {
                 events={today}
                 usersMap={usersMap}
                 timeFormat={dateFormatDistanceToNow}
+                workspacesMap={workspacesMap}
               />
             ) : (
               <>
@@ -164,6 +161,7 @@ const TimelinePage = ({ team, events }: TimelinePageData) => {
               team={team}
               events={thisWeek}
               usersMap={usersMap}
+              workspacesMap={workspacesMap}
             />
 
             <TimelineList
@@ -171,6 +169,7 @@ const TimelinePage = ({ team, events }: TimelinePageData) => {
               team={team}
               events={others}
               usersMap={usersMap}
+              workspacesMap={workspacesMap}
             />
             {events.length !== 10 && events.length % 10 === 0 && (
               <div className='more-button'>
@@ -179,7 +178,7 @@ const TimelinePage = ({ team, events }: TimelinePageData) => {
                   query={{ amount: Math.max(events.length, 20) + 10 }}
                   intent='timeline'
                 >
-                  Show More..
+                  {translate(lngKeys.GeneralShowMore)}
                 </TeamLink>
               </div>
             )}
@@ -208,6 +207,7 @@ const StyledTimelinePage = styled.div`
   .no-document {
     margin-top: ${({ theme }) => theme.space.default}px;
     font-size: ${({ theme }) => theme.fontSizes.small}px;
+    padding: 0 ${({ theme }) => theme.space.default}px;
   }
 
   h1 {
@@ -217,8 +217,9 @@ const StyledTimelinePage = styled.div`
   h2 {
     color: ${({ theme }) => theme.subtleTextColor};
     font-size: ${({ theme }) => theme.fontSizes.default}px;
-    padding: ${({ theme }) => theme.space.xsmall}px 0;
-    margin-top: ${({ theme }) => theme.space.large}px;
+    padding: ${({ theme }) => theme.space.xsmall}px
+      ${({ theme }) => theme.space.xlarge}px;
+    margin-top: ${({ theme }) => theme.space.medium}px;
     margin-bottom: 0;
     border-bottom: 1px solid ${({ theme }) => theme.subtleBorderColor};
   }

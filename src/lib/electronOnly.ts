@@ -33,6 +33,7 @@ const __ELECTRON_ONLY__: {
     options: Electron.SaveDialogOptions
   ): Promise<Electron.SaveDialogReturnValue>
   openExternal(url: string): void
+  openPath(fullPath: string, folderOnly?: boolean): void
   parseCSON(value: string): JsonValue
   stringifyCSON(value: any): string
   openNewWindow(options: BrowserWindowConstructorOptions): BrowserWindow
@@ -42,6 +43,7 @@ const __ELECTRON_ONLY__: {
     channel: string,
     listener: (event: IpcRendererEvent, ...args: any[]) => void
   ): void
+  sendIpcMessage(channel: string, data: any[]): void
   removeIpcListener(
     channel: string,
     listener: (event: IpcRendererEvent, ...args: any[]) => void
@@ -59,6 +61,7 @@ const __ELECTRON_ONLY__: {
   setCookie(cookieDetails: CookiesSetDetails): Promise<void>
   getCookie(filter: CookiesGetFilter): Promise<Cookie[]>
   removeCookie(url: string, name: string): Promise<void>
+  setBadgeCount(count: number): boolean
   got: Got
 } = (window as any).__ELECTRON_ONLY__
 
@@ -74,12 +77,14 @@ const {
   showOpenDialog,
   showSaveDialog,
   openExternal,
+  openPath,
   parseCSON,
   stringifyCSON,
   openNewWindow,
   openContextMenu,
   getPathByName,
   addIpcListener,
+  sendIpcMessage,
   removeIpcListener,
   removeAllIpcListeners,
   setAsDefaultProtocolClient,
@@ -91,6 +96,7 @@ const {
   setCookie,
   getCookie,
   removeCookie,
+  setBadgeCount,
   got,
 } = __ELECTRON_ONLY__ || {}
 
@@ -131,12 +137,14 @@ export {
   showOpenDialog,
   showSaveDialog,
   openExternal,
+  openPath,
   parseCSON,
   stringifyCSON,
   openNewWindow,
   openContextMenu,
   getPathByName,
   addIpcListener,
+  sendIpcMessage,
   removeIpcListener,
   removeAllIpcListeners,
   setAsDefaultProtocolClient,
@@ -148,5 +156,6 @@ export {
   setCookie,
   getCookie,
   removeCookie,
+  setBadgeCount,
   got,
 }

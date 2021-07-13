@@ -7,13 +7,7 @@ import React, {
 } from 'react'
 import { setAsDefaultProtocolClient, setCookie } from '../../lib/electronOnly'
 import { usePreferences } from '../../lib/preferences'
-import {
-  FormPrimaryButton,
-  FormGroup,
-  FormTextInput,
-  FormBlockquote,
-  FormSecondaryButton,
-} from '../atoms/form'
+import { FormGroup, FormTextInput, FormBlockquote } from '../atoms/form'
 import { generateId } from '../../lib/string'
 import {
   openLoginPage,
@@ -27,13 +21,14 @@ import {
   boostHubLoginRequestEventEmitter,
 } from '../../lib/events'
 import { useRouter } from '../../lib/router'
-import Icon from '../atoms/Icon'
 import { mdiLoading } from '@mdi/js'
 import BoostHubFeatureIntro from '../molecules/BoostHubFeatureIntro'
-import styled from '../../lib/styled'
 import { osName } from '../../lib/platform'
 import { fetchDesktopGlobalData } from '../../lib/boosthub'
 import { boostHubBaseUrl } from '../../cloud/lib/consts'
+import Icon from '../../shared/components/atoms/Icon'
+import styled from '../../shared/lib/styled'
+import Button from '../../shared/components/atoms/Button'
 
 const BoostHubSignInForm = () => {
   const { setPreferences } = usePreferences()
@@ -113,10 +108,12 @@ const BoostHubSignInForm = () => {
               id: team.id,
               name: team.name,
               domain: team.domain,
+              createdAt: team.createdAt,
               iconUrl:
                 team.icon != null
                   ? getBoostHubTeamIconUrl(team.icon.location)
                   : undefined,
+              personal: team.personal,
             }
           }),
         })
@@ -162,6 +159,10 @@ const BoostHubSignInForm = () => {
     setStatus('idle')
   }, [])
 
+  const navigateToCreateLocalSpacePage = useCallback(() => {
+    push('/app/storages')
+  }, [push])
+
   return (
     <Container>
       <h1 className='heading'>Create Account</h1>
@@ -171,13 +172,21 @@ const BoostHubSignInForm = () => {
             <BoostHubFeatureIntro />
           </div>
           <div className='control'>
-            <FormPrimaryButton onClick={startLoginRequest}>
+            <Button variant={'primary'} onClick={startLoginRequest}>
               Sign Up
-            </FormPrimaryButton>
+            </Button>
 
-            <FormSecondaryButton onClick={startLoginRequest}>
+            <Button variant={'secondary'} onClick={startLoginRequest}>
               Sign In
-            </FormSecondaryButton>
+            </Button>
+          </div>
+          <div className='control'>
+            <a
+              className='control-link'
+              onClick={navigateToCreateLocalSpacePage}
+            >
+              Create a local space without creating an account
+            </a>
           </div>
         </>
       ) : status === 'logging-in' ? (
@@ -192,9 +201,9 @@ const BoostHubSignInForm = () => {
             &nbsp;Waiting for signing in from browser...
           </p>
           <FormGroup style={{ textAlign: 'center' }}>
-            <FormPrimaryButton onClick={openLoginRequestPage}>
+            <Button variant={'primary'} onClick={openLoginRequestPage}>
               Open request signing in page again
-            </FormPrimaryButton>
+            </Button>
           </FormGroup>
           <FormGroup style={{ textAlign: 'center' }}>
             <a className='control-link' onClick={cancelSigningIn}>
@@ -217,13 +226,14 @@ const BoostHubSignInForm = () => {
                 />
               </FormGroup>
               <FormGroup style={{ textAlign: 'center' }}>
-                <FormPrimaryButton
+                <Button
+                  variant={'primary'}
                   onClick={() => {
                     login(code)
                   }}
                 >
                   Sign In
-                </FormPrimaryButton>
+                </Button>
               </FormGroup>
             </>
           ) : (
@@ -274,9 +284,14 @@ const Container = styled.div`
     }
   }
   .control-link {
-    color: ${({ theme }) => theme.uiTextColor};
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 30px;
+    margin-left: 40px;
+    color: ${({ theme }) => theme.colors.text.primary};
     &:hover {
-      color: ${({ theme }) => theme.textColor};
+      color: ${({ theme }) => theme.colors.text.link};
     }
     cursor: pointer;
   }

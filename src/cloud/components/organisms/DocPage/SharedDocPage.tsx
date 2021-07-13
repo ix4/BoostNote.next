@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import useRealtime from '../../../lib/editor/hooks/useRealtime'
 import { getRandomColor } from '../../../lib/utils/string'
 import { StyledDocPage } from '../../../components/organisms/DocPage/styles'
-import styled from '../../../lib/styled'
+import styled from '../../../../shared/lib/styled'
 import SyncStatus from '../../../components/organisms/Topbar/SyncStatus'
 import PresenceIcons from '../../../components/organisms/Topbar/PresenceIcons'
 import Spinner from '../../../components/atoms/CustomSpinner'
@@ -17,7 +17,6 @@ interface SharedDocPageProps {
 }
 
 const SharedDocPage = ({ doc, token }: SharedDocPageProps) => {
-  const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [userInfo] = useState(() => ({
     id: '#Guest',
@@ -37,12 +36,9 @@ const SharedDocPage = ({ doc, token }: SharedDocPageProps) => {
   useEffect(() => {
     if (realtime != null) {
       const content = realtime.doc.getText('content')
-      const title = realtime.doc.getText('title')
       setContent(content.toJSON())
-      setTitle(title.toJSON())
       realtime.doc.on('update', () => {
         setContent(content.toJSON())
-        setTitle(title.toJSON())
       })
     }
   }, [realtime])
@@ -90,7 +86,7 @@ const SharedDocPage = ({ doc, token }: SharedDocPageProps) => {
       )}
       {loaded ? (
         <>
-          <StyledTitle>{title}</StyledTitle>
+          <StyledTitle>{doc.title}</StyledTitle>
           <StyledContent>
             <MarkdownView
               content={content}
@@ -125,8 +121,9 @@ const StyledTitle = styled.h2`
   text-align: left;
   width: 100%;
   display: block;
-  font-size: ${({ theme }) => theme.fontSizes.xxxxlarge}px;
-  margin-top: ${({ theme }) => theme.space.small}px;
+  font-size: ${({ theme }) => theme.sizes.fonts.xl}px;
+  margin-top: ${({ theme }) => theme.sizes.spaces.sm}px;
+  padding: 0 ${({ theme }) => theme.sizes.spaces.md}px;
 `
 
 const StyledWarning = styled.div`
@@ -134,7 +131,7 @@ const StyledWarning = styled.div`
 
   .connect-warn {
     width: 100%;
-    margin-top: ${({ theme }) => theme.space.small}px;
+    margin-top: ${({ theme }) => theme.sizes.spaces.sm}px;
   }
 
   span {

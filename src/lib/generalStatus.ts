@@ -4,6 +4,8 @@ import { useSetState } from 'react-use'
 import { generalStatusKey } from './localStorageKeys'
 import { createStoreContext } from './context'
 import { getFolderItemId, getStorageItemId } from './nav'
+import { SerializedSubscription } from '../cloud/interfaces/db/subscription'
+import { SidebarTreeSortingOrder } from '../shared/lib/sidebar'
 
 export type ViewModeType = 'edit' | 'preview' | 'split'
 
@@ -18,8 +20,13 @@ export interface GeneralStatus {
     name: string
     domain: string
     iconUrl?: string
+    createdAt: string
+    subscription?: SerializedSubscription
+    personal: boolean
   }[]
   showingNoteContextMenu: boolean
+  sidebarTreeSortingOrder: SidebarTreeSortingOrder
+  focusOnEditorCursor: boolean
 }
 
 function loadGeneralStatus(): Partial<GeneralStatus> {
@@ -48,6 +55,8 @@ const baseGeneralStatus: GeneralStatus = {
   sideNavOpenedItemList: [],
   boostHubTeams: [],
   showingNoteContextMenu: false,
+  sidebarTreeSortingOrder: 'last-updated',
+  focusOnEditorCursor: false,
 }
 
 function useGeneralStatusStore() {

@@ -1,12 +1,21 @@
 import React from 'react'
-import styled from '../../../lib/styled'
-import { usePage } from '../../../lib/stores/pageStore'
 import cc from 'classcat'
+import { usePage } from '../../../lib/stores/pageStore'
 import { useSettings } from '../../../lib/stores/settings'
+import styled from '../../../../shared/lib/styled'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
 
-const TeamSubLimit = () => {
+const TeamSubLimit = ({
+  padded = true,
+  onLimitClick,
+}: {
+  padded?: boolean
+  onLimitClick?: () => void
+}) => {
   const { subscription, team, currentSubInfo } = usePage()
   const { openSettingsTab } = useSettings()
+  const { translate } = useI18n()
 
   if (
     (subscription != null && subscription.status === 'active') ||
@@ -18,40 +27,55 @@ const TeamSubLimit = () => {
 
   if (currentSubInfo.trialing) {
     return (
-      <StyledSidebarTeamSubLimit>
+      <Container
+        className={cc(['sub__limit', !padded && 'sub__limit--stripped'])}
+      >
         <a
           className='upgrade-link'
           href='#'
           onClick={(e: any) => {
             e.preventDefault()
+            if (onLimitClick != null) {
+              onLimitClick()
+              return
+            }
             openSettingsTab('teamUpgrade')
           }}
         >
-          <h6>Upgrade to go unlimited</h6>
+          <h6>{translate(lngKeys.SettingsSubLimitTrialTitle)}</h6>
           <p className='note-limit'>
-            Your workspace&apos;s trial of the Pro plan lasts through{' '}
-            {currentSubInfo.info.formattedEndDate}
+            {translate(lngKeys.SettingsSubLimitTrialDate, {
+              date: currentSubInfo.info.formattedEndDate,
+            })}
           </p>
           <p className='note-limit'>
-            You can upgrade at anytime during your trial.
+            {translate(lngKeys.SettingsSubLimitTrialUpgrade)}
           </p>
         </a>
-      </StyledSidebarTeamSubLimit>
+      </Container>
     )
   }
 
   return (
-    <StyledSidebarTeamSubLimit>
+    <Container
+      className={cc(['sub__limit', !padded && 'sub__limit--stripped'])}
+    >
       <a
         className='upgrade-link'
         href='#'
         onClick={(e: any) => {
           e.preventDefault()
+          if (onLimitClick != null) {
+            onLimitClick()
+            return
+          }
           openSettingsTab('teamUpgrade')
         }}
       >
         <p className='note-limit'>
-          {currentSubInfo.info.progressLabel} notes used
+          {translate(lngKeys.SettingsSubLimitUsed, {
+            docsNb: currentSubInfo.info.progressLabel,
+          })}
         </p>
         <div className='progress-sm'>
           <div
@@ -62,87 +86,93 @@ const TeamSubLimit = () => {
             style={{ width: `${currentSubInfo.info.rate}%` }}
           />
         </div>
-        <p>{currentSubInfo.info.label}</p>
+        {currentSubInfo.info.docLimit != null && (
+          <p>
+            {translate(lngKeys.SettingsSubLimitUnderFreePlan, {
+              limit: currentSubInfo.info.docLimit,
+            })}
+          </p>
+        )}
         {currentSubInfo.info.trialIsOver && (
           <p className='text-danger'>
-            Your pro plan trial has ended. Please upgrade now
+            {translate(lngKeys.SettingsSubLimitTrialEnd)}
           </p>
         )}
       </a>
-    </StyledSidebarTeamSubLimit>
+    </Container>
   )
 }
 
-const StyledSidebarTeamSubLimit = styled.div`
+const Container = styled.nav`
   width: 100%;
-  color: ${({ theme }) => theme.baseTextColor};
-  font-size: ${({ theme }) => theme.fontSizes.xsmall}px;
+  margin-top: ${({ theme }) => theme.sizes.spaces.l}px;
+
+  &.sub__limit--stripped {
+    margin: 0;
+    > * {
+      margin: 0 !important;
+    }
+  }
+
+  h6 {
+    margin: 0;
+    color: ${({ theme }) => theme.colors.variants.primary.base};
+    font-size: ${({ theme }) => theme.sizes.fonts.df}px;
+  }
 
   p {
-    color: ${({ theme }) => theme.subtleTextColor};
-    margin: 10px 0px;
+    margin: ${({ theme }) => theme.sizes.spaces.sm}px 0;
+    color: ${({ theme }) => theme.colors.text.subtle};
+    font-size: ${({ theme }) => theme.sizes.fonts.sm}px;
+  }
+
+  .upgrade-link {
+    display: block;
+    margin-top: ${({ theme }) => theme.sizes.spaces.sm}px;
+    margin-bottom: ${({ theme }) => theme.sizes.spaces.xsm}px;
+    padding: ${({ theme }) => theme.sizes.spaces.df}px;
+    cursor: pointer;
+    text-decoration: none;
+
+    &:hover,
+    &:focus {
+      background-color: ${({ theme }) => theme.colors.background.tertiary};
+    }
   }
 
   .note-limit {
-    font-size: ${({ theme }) => theme.fontSizes.small}px;
+    font-size: ${({ theme }) => theme.sizes.fonts.sm}px;
   }
 
   .progress-sm {
     display: block;
-    width: 100%;
-    overflow: hidden;
-    height: 3px;
-    font-size: 0.75rem;
-    background-color: ${({ theme }) => theme.subtleBackgroundColor};
-    border-radius: 0.25rem;
-    text-align: center;
     position: relative;
+    width: 100%;
+    height: 3px;
+    background-color: ${({ theme }) => theme.colors.background.quaternary};
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-align: center;
   }
 
   .progress-bar {
-    background-color: ${({ theme }) => theme.primaryBackgroundColor};
-    max-width: 100%;
     flex-direction: column;
     justify-content: center;
+    height: 3px;
+    max-width: 100%;
+    background-color: ${({ theme }) => theme.colors.background.primary};
     text-align: center;
     white-space: nowrap;
     transition: width 0.6s ease;
-    height: 3px;
 
     &.over-limit {
-      background-color: ${({ theme }) => theme.dangerBackgroundColor};
+      background-color: ${({ theme }) => theme.colors.variants.danger.base};
     }
-  }
-
-  .upgrade-link {
-    &:hover,
-    &:focus {
-      background-color: ${({ theme }) => theme.subtleBackgroundColor};
-    }
-    cursor: pointer;
-    display: block;
-    margin: 10px 0 5px 0;
-    padding: 15px;
-    text-decoration: none;
-  }
-
-  h6 {
-    font-size: ${({ theme }) => theme.fontSizes.default}px;
-    margin: 0;
-    color: ${({ theme }) => theme.primaryTextColor};
-  }
-
-  .progress-label {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    margin: auto;
   }
 
   .text-danger {
-    color: ${({ theme }) => theme.dangerTextColor};
+    color: ${({ theme }) => theme.colors.variants.danger.base};
   }
 `
 

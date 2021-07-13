@@ -1,13 +1,15 @@
 import React, { useState, useCallback } from 'react'
 import styled from '../../../lib/styled'
-import CustomButton from '../../atoms/buttons/CustomButton'
 import Flexbox from '../../atoms/Flexbox'
 import Spinner from '../../atoms/CustomSpinner'
 import { startTeamFreeTrial } from '../../../api/teams/subscription/trial'
 import { SerializedTeam } from '../../../interfaces/db/team'
 import { usePage } from '../../../lib/stores/pageStore'
 import { freeTrialPeriodDays } from '../../../lib/subscription'
-import { useToast } from '../../../../lib/v2/stores/toast'
+import { useToast } from '../../../../shared/lib/stores/toast'
+import Button from '../../../../shared/components/atoms/Button'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
 
 interface FreeTrialPopupProps {
   team: SerializedTeam
@@ -18,6 +20,7 @@ const FreeTrialPopup = ({ team, close }: FreeTrialPopupProps) => {
   const [sending, setSending] = useState(false)
   const { updateTeamSubscription } = usePage()
   const { pushApiErrorMessage } = useToast()
+  const { translate } = useI18n()
 
   const onCloseCallback = useCallback(() => {
     if (sending) {
@@ -48,16 +51,27 @@ const FreeTrialPopup = ({ team, close }: FreeTrialPopupProps) => {
       <StyledFreeTrialPopupBackground onClick={onCloseCallback} />
       <StyledFreeTrialPopupContainer>
         <Flexbox flex='1 1 auto' direction='column' alignItems='flex-start'>
-          <StyledFreeTrialTitle>Try the Pro Plan for free</StyledFreeTrialTitle>
-          <p>
-            You&apos;ll get access to most features of a paid Pro Plan such as
-            unlimited documents, revision history, etc... for{' '}
-            {freeTrialPeriodDays} days.
-          </p>
-          <p>No credit card information is necessary for now.</p>
+          <StyledFreeTrialTitle>
+            {translate(lngKeys.FreeTrialModalTitle)}
+          </StyledFreeTrialTitle>
+          <video
+            src='/app/static/videos/pro-intro.mp4'
+            className='intro-video'
+            autoPlay
+            muted
+            loop
+          ></video>
+          <div className='intro-text'>
+            <p>
+              {translate(lngKeys.FreeTrialModalBody, {
+                days: freeTrialPeriodDays,
+              })}
+            </p>
+            <p>{translate(lngKeys.FreeTrialModalDisclaimer)}</p>
+          </div>
         </Flexbox>
-        <Flexbox flex='0 0 auto' direction='column'>
-          <CustomButton
+        <Flexbox flex='0 0 auto' direction='column' className='button__group'>
+          <Button
             variant='primary'
             className='btn'
             disabled={sending}
@@ -66,17 +80,17 @@ const FreeTrialPopup = ({ team, close }: FreeTrialPopupProps) => {
             {sending ? (
               <Spinner className='relative spinner' />
             ) : (
-              'Start Free Trial'
+              translate(lngKeys.FreeTrialModalCTA)
             )}
-          </CustomButton>
-          <CustomButton
-            variant='inverse-secondary'
+          </Button>
+          <Button
+            variant='bordered'
             className='btn'
             onClick={onCloseCallback}
             disabled={sending}
           >
-            Cancel
-          </CustomButton>
+            {translate(lngKeys.GeneralCancel)}
+          </Button>
         </Flexbox>
       </StyledFreeTrialPopupContainer>
     </StyledFreeTrialPopup>
@@ -96,6 +110,15 @@ const StyledFreeTrialPopup = styled.div`
   right: 0;
   bottom: 0;
   overflow: hidden;
+  .button__group {
+    button {
+      margin: 0;
+    }
+
+    button + button {
+      margin-top: 8px;
+    }
+  }
 `
 
 const StyledFreeTrialPopupBackground = styled.div`
@@ -121,7 +144,7 @@ const StyledFreeTrialPopupContainer = styled.div`
   max-width: 80vw;
   max-height: 80vh;
   width: 600px;
-  height: 400px;
+  height: 650px;
   background-color: ${({ theme }) => theme.baseBackgroundColor};
   box-shadow: ${({ theme }) => theme.baseShadowColor};
   border-radius: 4px;
@@ -138,10 +161,23 @@ const StyledFreeTrialPopupContainer = styled.div`
     border-color: ${({ theme }) => theme.whiteBorderColor};
     border-right-color: transparent;
   }
+
+  .intro-video {
+    max-width: 100%;
+  }
+
+  .intro-text {
+    margin: ${({ theme }) => theme.space.default}px 0;
+
+    p {
+      line-height: 1.6;
+    }
+  }
 `
 
-const StyledFreeTrialTitle = styled.h2`
+const StyledFreeTrialTitle = styled.h1`
   margin-bottom: ${({ theme }) => theme.space.default}px;
+  font-size: ${({ theme }) => theme.fontSizes.xlarge}px;
 `
 
 export default FreeTrialPopup

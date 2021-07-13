@@ -1,25 +1,22 @@
 import React, { FormEvent, useState, useCallback, useRef } from 'react'
-import CustomButton from '../../atoms/buttons/CustomButton'
-import { Spinner } from '../../atoms/Spinner'
-import { StyledAppFeedbackForm } from './styled'
-import { SelectChangeEventHandler } from '../../../lib/utils/events'
-import {
-  SectionSelect,
-  SectionHeader2,
-  SectionTextarea,
-} from '../../organisms/settings/styled'
 import { registerAppFeedback } from '../../../api/users/appfeedback'
 import { AppFeedbackTypeOption } from '../../../interfaces/db/userAppFeedback'
 import ColoredBlock from '../../atoms/ColoredBlock'
 import { useEffectOnce } from 'react-use'
-import { useToast } from '../../../../lib/v2/stores/toast'
-
-const typeOptions: AppFeedbackTypeOption[] = ['Feature Request', 'Bug Report']
+import { useToast } from '../../../../shared/lib/stores/toast'
+import Form from '../../../../shared/components/molecules/Form'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
+import Button from '../../../../shared/components/atoms/Button'
+import { FormSelectOption } from '../../../../shared/components/molecules/Form/atoms/FormSelect'
 
 const AppFeedbackForm = () => {
-  const [feedbackType, setFeedbackType] = useState<AppFeedbackTypeOption>(
-    'Feature Request'
-  )
+  const { translate } = useI18n()
+
+  const [feedbackType, setFeedbackType] = useState<FormSelectOption>({
+    label: translate(lngKeys.CommunityFeatureRequests),
+    value: 'Feature Request',
+  })
   const [feedback, setFeedback] = useState<string>('')
   const [sending, setSending] = useState<boolean>(false)
   const { pushMessage } = useToast()
@@ -40,12 +37,15 @@ const AppFeedbackForm = () => {
       }
       setSending(true)
       try {
-        await registerAppFeedback({ type: feedbackType, feedback })
+        await registerAppFeedback({
+          type: feedbackType.value as AppFeedbackTypeOption,
+          feedback,
+        })
         setShowSuccessMessage(true)
       } catch (error) {
         pushMessage({
-          title: 'Error',
-          description: `Could not send your feedback`,
+          title: translate(lngKeys.GeneralError),
+          description: translate(lngKeys.CommunityFeedbackSendError),
         })
       }
       setSending(false)
@@ -57,13 +57,13 @@ const AppFeedbackForm = () => {
       feedback,
       feedbackType,
       setShowSuccessMessage,
+      translate,
     ]
   )
 
-  const feedbackTypeChangeHandler: SelectChangeEventHandler = useCallback(
-    async (event) => {
-      event.preventDefault()
-      setFeedbackType(event.target.value as AppFeedbackTypeOption)
+  const feedbackTypeChangeHandler = useCallback(
+    async (value: FormSelectOption) => {
+      setFeedbackType(value)
     },
     []
   )
@@ -77,55 +77,70 @@ const AppFeedbackForm = () => {
   )
 
   const resetForm = useCallback(() => {
-    setFeedbackType('Feature Request')
+    setFeedbackType({
+      label: translate(lngKeys.CommunityFeatureRequests),
+      value: 'Feature Request',
+    })
     setFeedback('')
     setShowSuccessMessage(false)
-  }, [])
+  }, [translate])
 
   if (showSuccessMessage) {
     return (
       <div>
         <ColoredBlock variant='success'>
-          Your feedback is always appreciated! Thank you for reaching out.
+          {translate(lngKeys.CommunityFeedbackSendSuccess)}
         </ColoredBlock>
 
-        <CustomButton variant='secondary' onClick={resetForm}>
-          Send more
-        </CustomButton>
+        <Button variant='secondary' onClick={resetForm}>
+          {translate(lngKeys.GeneralSendMore)}
+        </Button>
       </div>
     )
   }
 
   return (
-    <StyledAppFeedbackForm onSubmit={sendFeedback}>
-      <SectionHeader2>Type of feedback</SectionHeader2>
-      <SectionSelect value={feedbackType} onChange={feedbackTypeChangeHandler}>
-        {typeOptions.map((val) => (
-          <option key={`select-type-${val}`} value={val}>
-            {val}
-          </option>
-        ))}
-      </SectionSelect>
-
-      <SectionHeader2>Free form</SectionHeader2>
-      <SectionTextarea
-        value={feedback}
-        ref={freeFormRef}
-        onChange={feedbackOnChangeEvent}
-      />
-
-      <div className='submit-row'>
-        <CustomButton
-          type='submit'
-          variant='primary'
-          className='submit-feedback'
-          disabled={sending}
-        >
-          {sending ? <Spinner /> : 'Send'}
-        </CustomButton>
-      </div>
-      <div className='clear' />
-    </StyledAppFeedbackForm>
+    <Form
+      onSubmit={sendFeedback}
+      rows={[
+        {
+          title: translate(lngKeys.CommunityFeedbackType),
+          items: [
+            {
+              type: 'select',
+              props: {
+                value: feedbackType,
+                onChange: feedbackTypeChangeHandler,
+                options: [
+                  {
+                    label: translate(lngKeys.CommunityFeatureRequests),
+                    value: 'Feature Request',
+                  },
+                  {
+                    label: translate(lngKeys.CommunityBugReport),
+                    value: 'Bug Report',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        {
+          title: translate(lngKeys.CommunityFeedbackFreeForm),
+          items: [
+            {
+              type: 'textarea',
+              props: {
+                value: feedback,
+                onChange: feedbackOnChangeEvent,
+                ref: freeFormRef,
+              },
+            },
+          ],
+        },
+      ]}
+      submitButton={{ label: translate(lngKeys.GeneralSendVerb) }}
+    />
   )
 }
 

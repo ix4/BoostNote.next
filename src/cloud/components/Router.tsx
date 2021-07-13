@@ -10,11 +10,9 @@ import AccountDeletePage from '../pages/account/delete'
 
 import { SidebarCollapseProvider } from '../lib/stores/sidebarCollapse'
 import { combineProviders } from '../lib/utils/context'
-import { EmojiPickerProvider } from '../lib/stores/emoji'
 import { OnboardingProvider } from '../lib/stores/onboarding'
 import { SettingsProvider, useSettings } from '../lib/stores/settings'
 
-import { ModalProvider } from '../lib/stores/modal'
 import { PreferencesProvider } from '../lib/stores/preferences'
 import { SearchProvider } from '../lib/stores/search'
 import { ExternalEntitiesProvider } from '../lib/stores/externalEntities'
@@ -25,11 +23,9 @@ import * as intercom from '../lib/intercom'
 import { intercomAppId } from '../lib/consts'
 
 import GlobalStyle from './GlobalStyle'
+import GlobalStyleV2 from '../../shared/components/atoms/GlobalStyle'
 import CodeMirrorStyle from './atoms/CodeMirrorStyle'
-import Modal from './organisms/Modal'
 import SettingsComponent from './organisms/settings/SettingsComponent'
-import EmojiPicker from './molecules/EmojiPicker'
-import SearchModal from './organisms/SearchModal'
 import { GetInitialPropsParameters } from '../interfaces/pages'
 import ResourceIndex from '../pages/[teamId]/[resourceId]'
 import TeamIndex from '../pages/[teamId]'
@@ -39,38 +35,41 @@ import ArchivedPage from '../pages/[teamId]/archived'
 import SharedDocsListPage from '../pages/[teamId]/shared'
 import DeleteTeamPage from '../pages/[teamId]/delete'
 import TimelinePage from '../pages/[teamId]/timeline'
-import UploadListPage from '../pages/[teamId]/uploads'
 import BookmarksListPage from '../pages/[teamId]/bookmarks'
 import CooperatePage from '../pages/cooperate'
 import { useRealtimeConn } from '../lib/stores/realtimeConn'
 import SettingsPage from '../pages/settings'
-import Helper from './molecules/Helper'
 import OpenInvitePage from '../pages/[teamId]/invite'
 import Spinner from './atoms/CustomSpinner'
 import TagsShowPage from '../pages/[teamId]/labels/[labelId]'
 import SharedPage from '../pages/shared/[link]'
-import { selectV2Theme } from '../../lib/v2/styled/styleFunctions'
-import { V2ToastProvider } from '../../lib/v2/stores/toast'
-import { V2EmojiProvider } from '../../lib/v2/stores/emoji'
-import { V2WindowProvider } from '../../lib/v2/stores/window'
-import { V2ContextMenuProvider } from '../../lib/v2/stores/contextMenu'
-import { V2ModalProvider } from '../../lib/v2/stores/modal'
-import { V2DialogProvider } from '../../lib/v2/stores/dialog'
-import Toast from '../../components/v2/organisms/Toast'
-import Dialog from '../../components/v2/organisms/Dialog/Dialog'
-import ContextMenu from '../../components/v2/molecules/ContextMenu'
+import { selectV2Theme } from '../../shared/lib/styled/styleFunctions'
+import { V2ToastProvider } from '../../shared/lib/stores/toast'
+import { V2EmojiProvider } from '../../shared/lib/stores/emoji'
+import { V2WindowProvider } from '../../shared/lib/stores/window'
+import { V2ContextMenuProvider } from '../../shared/lib/stores/contextMenu'
+import { V2ModalProvider } from '../../shared/lib/stores/modal'
+import { V2DialogProvider } from '../../shared/lib/stores/dialog'
+import Toast from '../../shared/components/organisms/Toast'
+import Dialog from '../../shared/components/organisms/Dialog/Dialog'
+import ContextMenu from '../../shared/components/molecules/ContextMenu'
 import WorkspaceShowPage from '../pages/[teamId]/workspaces/[workspaceId]'
-import V2Modal from '../../components/v2/organisms/Modal'
+import CloudModal from './organisms/CloudModal'
+import { CommentsProvider } from '../lib/stores/comments'
+import SmartFolderPage from '../pages/[teamId]/smart-folders/[smartFolderId]'
+import DocStatusShowPage from '../pages/[teamId]/status/[docStatus]'
+import EmojiPicker from '../../shared/components/molecules/EmojiPicker'
+import { NotificationsProvider } from '../../shared/lib/stores/notifications'
+import { TeamIntegrationsProvider } from '../../shared/lib/stores/integrations'
 
 const CombinedProvider = combineProviders(
   SidebarCollapseProvider,
-  EmojiPickerProvider,
   OnboardingProvider,
-  ModalProvider,
   PreferencesProvider,
   SettingsProvider,
   SearchProvider,
-  ExternalEntitiesProvider
+  ExternalEntitiesProvider,
+  CommentsProvider
 )
 
 const V2CombinedProvider = combineProviders(
@@ -79,7 +78,10 @@ const V2CombinedProvider = combineProviders(
   V2WindowProvider,
   V2ContextMenuProvider,
   V2ModalProvider,
-  V2DialogProvider
+  V2DialogProvider,
+  CommentsProvider,
+  NotificationsProvider,
+  TeamIntegrationsProvider
 )
 
 interface PageInfo {
@@ -250,17 +252,14 @@ const Router = () => {
               <V2ThemeProvider>
                 {<pageInfo.Component {...pageInfo.pageProps} />}
 
-                <GlobalStyle />
+                <GlobalStyleV2 />
                 <CodeMirrorStyle />
-                <Modal />
-                <V2Modal />
+                <CloudModal />
                 <Toast />
                 <SettingsComponent />
                 <ContextMenu />
                 <EmojiPicker />
                 <Dialog />
-                <SearchModal />
-                <Helper />
               </V2ThemeProvider>
             </CustomThemeProvider>
           </NavProvider>
@@ -407,11 +406,6 @@ function getPageComponent(pathname: string): PageSpec | null {
           Component: TimelinePage,
           getInitialProps: TimelinePage.getInitialProps,
         }
-      case 'uploads':
-        return {
-          Component: UploadListPage,
-          getInitialProps: UploadListPage.getInitialProps,
-        }
       case 'bookmarks':
         return {
           Component: BookmarksListPage,
@@ -431,6 +425,16 @@ function getPageComponent(pathname: string): PageSpec | null {
         return {
           Component: WorkspaceShowPage,
           getInitialProps: WorkspaceShowPage.getInitialProps,
+        }
+      case 'smart-folders':
+        return {
+          Component: SmartFolderPage,
+          getInitialProps: SmartFolderPage.getInitialProps,
+        }
+      case 'status':
+        return {
+          Component: DocStatusShowPage,
+          getInitialProps: DocStatusShowPage.getInitialProps,
         }
       default:
         return {

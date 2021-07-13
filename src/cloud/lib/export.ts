@@ -1,6 +1,7 @@
 import unified from 'unified'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
+import remarkAdmonitions from 'remark-admonitions'
 import remarkMath from 'remark-math'
 import rehypeDocument from 'rehype-document'
 import rehypeStringify from 'rehype-stringify'
@@ -10,16 +11,22 @@ import rehypeKatex from 'rehype-katex'
 import { mergeDeepRight, prop } from 'ramda'
 import gh from 'hast-util-sanitize/lib/github.json'
 import { downloadString } from './download'
-import rehypeCodeMirror from './rehypeCodeMirror'
+import rehypeCodeMirror from '../../shared/lib/codemirror/rehypeCodeMirror'
 import { SerializedDoc } from '../interfaces/db/doc'
 import { filenamify } from './utils/string'
-import { UserSettings } from './stores/settings/types'
+import { UserSettings } from './stores/settings'
 import { getGlobalCss } from '../components/GlobalStyle'
 import { selectTheme } from './styled'
 import { boostHubBaseUrl } from './consts'
 
 export function filenamifyTitle(title: string): string {
   return filenamify(title.toLowerCase().replace(/\s+/g, '-'))
+}
+
+const remarkAdmonitionOptions = {
+  tag: ':::',
+  icons: 'emoji',
+  infima: false,
 }
 
 const sanitizeSchema = mergeDeepRight(gh, {
@@ -38,6 +45,7 @@ export const exportAsHtmlFile = async (
   const file = await unified()
     .use(remarkParse)
     .use(remarkMath)
+    .use(remarkAdmonitions, remarkAdmonitionOptions)
     .use([remarkRehype, { allowDangerousHTML: false }])
     .use(rehypeCodeMirror, {
       ignoreMissing: true,
@@ -46,9 +54,9 @@ export const exportAsHtmlFile = async (
     .use(rehypeRaw)
     .use(rehypeSanitize, sanitizeSchema)
     .use(rehypeDocument, {
-      title: doc.head.title,
+      title: doc.title,
       style: previewStyle,
-      css: 'https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css',
+      css: getCssLinks(preferences),
       meta: { keywords: (doc.tags || []).map(prop('text')).join() },
     })
     .use(rehypeStringify)
@@ -57,7 +65,7 @@ export const exportAsHtmlFile = async (
 
   downloadString(
     file.toString(),
-    `${filenamifyTitle(doc.head.title)}.html`,
+    `${filenamifyTitle(doc.title)}.html`,
     'text/html'
   )
 }
@@ -75,7 +83,7 @@ export const exportAsMarkdownFile = async (
     content =
       [
         '---',
-        `title: "${doc.head!.title}"`,
+        `title: "${doc.title}"`,
         `tags: "${(doc.tags || []).map(prop('text')).join()}"`,
         '---',
         '',
@@ -83,34 +91,49 @@ export const exportAsMarkdownFile = async (
       ].join('\n') + content
   }
 
-  downloadString(
-    content,
-    `${filenamifyTitle(doc.head.title)}.md`,
-    'text/markdown'
-  )
+  downloadString(content, `${filenamifyTitle(doc.title)}.md`, 'text/markdown')
 }
 
-const fetchCorrectMdThemeName = (theme: string) => {
-  return theme === 'solarized-dark' ? 'solarized' : theme
+const fetchCorrectMdThemeName = (theme: string, appTheme: string) => {
+  if (theme === 'solarized-dark') {
+    return 'solarized'
+  }
+  if (theme === 'default') {
+    if (appTheme === 'light') {
+      return null
+    }
+    return 'material-darker'
+  }
+
+  return theme
 }
 
 const getCssLinks = (settings: UserSettings) => {
   const cssHrefs: string[] = []
 
-  cssHrefs.push('https://cdn.jsdelivr.net/npm/katex@0.11.1/dist/katex.min.css')
+  cssHrefs.push(boostHubBaseUrl + '/app/katex/katex.min.css')
+  cssHrefs.push(boostHubBaseUrl + '/app/remark-admonitions/classic.css')
+
+  const editorTheme = fetchCorrectMdThemeName(
+    settings['general.editorTheme'],
+    settings['general.theme']
+  )
+  if (editorTheme != null) {
+    const editorThemePath =
+      boostHubBaseUrl + `/app/codemirror/theme/${editorTheme}.css`
+    cssHrefs.push(editorThemePath)
+  }
 
   const markdownCodeBlockTheme = fetchCorrectMdThemeName(
-    settings['general.codeBlockTheme']
+    settings['general.codeBlockTheme'],
+    settings['general.theme']
   )
-  const editorTheme = fetchCorrectMdThemeName(settings['general.editorTheme'])
-
-  const editorThemePath =
-    boostHubBaseUrl + `/static/codemirror/theme/${editorTheme}.css`
-
-  cssHrefs.push(editorThemePath)
-  if (markdownCodeBlockTheme !== editorTheme && markdownCodeBlockTheme) {
+  if (
+    markdownCodeBlockTheme != null &&
+    markdownCodeBlockTheme !== editorTheme
+  ) {
     cssHrefs.push(
-      boostHubBaseUrl + `/static/codemirror/theme/${markdownCodeBlockTheme}.css`
+      boostHubBaseUrl + `/app/codemirror/theme/${markdownCodeBlockTheme}.css`
     )
   }
   return cssHrefs
@@ -174,10 +197,11 @@ export async function convertMarkdownToPdfExportableHtml(
 ): Promise<string> {
   const file = await unified()
     .use(remarkParse)
+    .use(remarkAdmonitions, remarkAdmonitionOptions)
+    .use(remarkMath)
     .use([remarkRehype, { allowDangerousHTML: true }])
     .use(rehypeRaw)
     .use(rehypeSanitize, schema)
-    .use(remarkMath)
     .use(rehypeCodeMirror, {
       ignoreMissing: true,
       theme: preferences['markdown.codeBlockTheme'],

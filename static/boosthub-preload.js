@@ -75,3 +75,11 @@ window.__ELECTRON_ONLY__.removeHostListener = removeHostListener
 window.__ELECTRON_ONLY__.removeAllHostListeners = removeAllHostListeners
 window.__ELECTRON_ONLY__.addHostListenerOnce = addHostListenerOnce
 window.__ELECTRON_ONLY__.openInBrowser = openInBrowser
+
+const handler = (event) => {
+  event.preventDefault()
+  event.stopPropagation()
+  sendToHost('open-context-menu')
+}
+window.addEventListener('contextmenu', handler)
+window.__ELECTRON_ONLY__.globalContextMenuIsConfigured = true

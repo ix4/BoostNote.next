@@ -1,6 +1,4 @@
 import React, { useCallback, useEffect } from 'react'
-import { SerializedDocWithBookmark } from '../../../interfaces/db/doc'
-import { SerializedTeam } from '../../../interfaces/db/team'
 import {
   mdiFormatBold,
   mdiFormatItalic,
@@ -12,27 +10,29 @@ import {
   mdiCheckboxMarkedOutline,
   mdiFormatHeaderPound,
   mdiCodeNotEqualVariant,
+  mdiPageNextOutline,
 } from '@mdi/js'
 import { Position } from 'codemirror'
 import EditorToolButton from './EditorToolButton'
 import { StyledEditorToolList } from './styled'
-import EditorToolHeaderDropdown from './EditorHeaderTool'
+import EditorHeaderToolDropdown from './EditorHeaderTool'
+import EditorAdmonitionToolDropdown from './EditorAdmonitionTool'
 import { FormattingTool } from './types'
-import EditorIntegrationToolButton from './EditorIntegrationToolButton'
 import {
   applyBoldStyleEventEmitter,
   applyItalicStyleEventEmitter,
 } from '../../../lib/utils/events'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
 
 interface EditorToolbarProps {
-  currentDoc: SerializedDocWithBookmark
-  team: SerializedTeam
   editorRef?: React.MutableRefObject<CodeMirror.Editor | null>
 }
 
 const spaceRegex = /^$|\s+/
 
 const EditorToolbar = ({ editorRef }: EditorToolbarProps) => {
+  const { translate } = useI18n()
   const onFormatCallback = useCallback(
     (format: FormattingTool) => {
       if (editorRef == null || editorRef.current == null) {
@@ -96,6 +96,41 @@ const EditorToolbar = ({ editorRef }: EditorToolbarProps) => {
           break
         case 'header6':
           formattingOptions = { markerLeft: '###### ' }
+          break
+        case 'admonitionNote':
+          formattingOptions = {
+            markerLeft: ':::note',
+            markerRight: ':::',
+            breakLine: true,
+          }
+          break
+        case 'admonitionTip':
+          formattingOptions = {
+            markerLeft: ':::tip',
+            markerRight: ':::',
+            breakLine: true,
+          }
+          break
+        case 'admonitionImportant':
+          formattingOptions = {
+            markerLeft: ':::important',
+            markerRight: ':::',
+            breakLine: true,
+          }
+          break
+        case 'admonitionDanger':
+          formattingOptions = {
+            markerLeft: ':::danger',
+            markerRight: ':::',
+            breakLine: true,
+          }
+          break
+        case 'admonitionWarning':
+          formattingOptions = {
+            markerLeft: ':::warning',
+            markerRight: ':::',
+            breakLine: true,
+          }
           break
         case 'code':
           formattingOptions = { markerLeft: '`', markerRight: '`' }
@@ -164,56 +199,60 @@ const EditorToolbar = ({ editorRef }: EditorToolbarProps) => {
 
   return (
     <StyledEditorToolList>
-      <EditorIntegrationToolButton />
-      <EditorToolHeaderDropdown
+      <EditorHeaderToolDropdown
         path={mdiFormatHeaderPound}
-        tooltip='Add header text'
+        tooltip={translate(lngKeys.EditorToolbarTooltipHeader)}
         onFormatCallback={onFormatCallback}
       />
       <EditorToolButton
         path={mdiCodeNotEqualVariant}
-        tooltip='Insert a codefence'
+        tooltip={translate(lngKeys.EditorToolbarTooltipCodefence)}
         onClick={() => onFormatCallback('codefence')}
       />
       <EditorToolButton
         path={mdiFormatQuoteClose}
-        tooltip='Insert a quote'
+        tooltip={translate(lngKeys.EditorToolbarTooltipQuote)}
         onClick={() => onFormatCallback('quote')}
+      />
+      <EditorAdmonitionToolDropdown
+        path={mdiPageNextOutline}
+        tooltip={translate(lngKeys.EditorToolbarTooltipAdmonition)}
+        onFormatCallback={onFormatCallback}
       />
       <EditorToolButton
         path={mdiFormatListBulleted}
-        tooltip='Add a bulleted list'
+        tooltip={translate(lngKeys.EditorToolbarTooltipList)}
         onClick={() => onFormatCallback('bulletedList')}
       />
       <EditorToolButton
         path={mdiFormatListNumbered}
-        tooltip='Add a numbered list'
+        tooltip={translate(lngKeys.EditorToolbarTooltipNumberedList)}
         onClick={() => onFormatCallback('numberedList')}
       />
       <EditorToolButton
         path={mdiCheckboxMarkedOutline}
-        tooltip='Add a task list'
+        tooltip={translate(lngKeys.EditorToolbarTooltipTaskList)}
         style={{ marginRight: 20 }}
         onClick={() => onFormatCallback('taskList')}
       />
       <EditorToolButton
         path={mdiFormatBold}
-        tooltip='Add bold text'
+        tooltip={translate(lngKeys.EditorToolbarTooltipBold)}
         onClick={applyBoldStyle}
       />
       <EditorToolButton
         path={mdiFormatItalic}
-        tooltip='Add italic text'
+        tooltip={translate(lngKeys.EditorToolbarTooltipItalic)}
         onClick={applyItalicStyle}
       />
       <EditorToolButton
         path={mdiCodeTags}
-        tooltip='Insert code'
+        tooltip={translate(lngKeys.EditorToolbarTooltipCode)}
         onClick={() => onFormatCallback('code')}
       />
       <EditorToolButton
         path={mdiLinkVariant}
-        tooltip='Add a link'
+        tooltip={translate(lngKeys.EditorToolbarTooltipLink)}
         onClick={() => onFormatCallback('link')}
       />
     </StyledEditorToolList>
@@ -391,7 +430,7 @@ function getLineBreaksFromFormat(
   const nextLine = editor.getLine(anchor.line + 1) || ''
   linebreaks.afterWord = nextLine.trim() === '' ? 0 : 1
 
-  if (markerRight === '```') {
+  if (markerRight === '```' || markerRight === ':::') {
     linebreaks.beforeWord = 1
     linebreaks.afterMark = linebreaks.afterWord
     linebreaks.afterWord = 1
@@ -559,4 +598,4 @@ function handleSelectionReplace(
   editor.setSelection(newSelectionAnchor, newSelectionHead)
 }
 
-export default EditorToolbar
+export default React.memo(EditorToolbar)

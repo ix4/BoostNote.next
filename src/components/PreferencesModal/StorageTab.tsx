@@ -2,14 +2,11 @@ import React, { useCallback, useState } from 'react'
 import { useDb } from '../../lib/db'
 import { NoteStorage } from '../../lib/db/types'
 import { useRouter } from '../../lib/router'
-import { useDialog, DialogIconTypes } from '../../lib/dialog'
-import { useToast } from '../../lib/toast'
 import { useTranslation } from 'react-i18next'
 import {
   FormHeading,
   FormGroup,
   FormTextInput,
-  FormPrimaryButton,
   FormLabelGroup,
   FormLabelGroupLabel,
   FormLabelGroupContent,
@@ -24,7 +21,11 @@ import {
   boostHubPricingPageUrl,
 } from '../../lib/boosthub'
 import Alert from '../atoms/Alert'
-import InlineLinkButton from '../atoms/InlineLinkButton'
+import { useToast } from '../../shared/lib/stores/toast'
+import Button from '../../shared/components/atoms/Button'
+import styled from '../../shared/lib/styled'
+import InlineLink from '../atoms/InlineLink'
+import { useDialog, DialogIconTypes } from '../../shared/lib/stores/dialog'
 
 interface StorageEditPageProps {
   storage: NoteStorage
@@ -47,22 +48,29 @@ const StorageEditPage = ({ storage }: StorageEditPageProps) => {
           ? "This operation won't delete the actual data files in your disk. You can add it to the app again."
           : t('storage.removeMessage'),
       iconType: DialogIconTypes.Warning,
-      buttons: [t('storage.remove'), t('general.cancel')],
-      defaultButtonIndex: 0,
-      cancelButtonIndex: 1,
-      onClose: async (value: number | null) => {
-        if (value === 0) {
-          try {
-            await db.removeStorage(storage.id)
-            router.push('/app')
-          } catch {
-            pushMessage({
-              title: t('general.networkError'),
-              description: `An error occurred while deleting space (id: ${storage.id})`,
-            })
-          }
-        }
-      },
+      buttons: [
+        {
+          variant: 'warning',
+          label: t('storage.remove'),
+          onClick: async () => {
+            try {
+              await db.removeStorage(storage.id)
+              router.push('/app')
+            } catch {
+              pushMessage({
+                title: t('general.networkError'),
+                description: `An error occurred while deleting space (id: ${storage.id})`,
+              })
+            }
+          },
+        },
+        {
+          label: t('general.cancel'),
+          cancelButton: true,
+          defaultButton: true,
+          variant: 'secondary',
+        },
+      ],
     })
   }, [storage, t, db, router, messageBox, pushMessage])
 
@@ -88,7 +96,9 @@ const StorageEditPage = ({ storage }: StorageEditPageProps) => {
         </FormLabelGroupContent>
       </FormLabelGroup>
       <FormControlGroup>
-        <FormPrimaryButton onClick={updateStorageName}>Save</FormPrimaryButton>
+        <Button variant={'primary'} onClick={updateStorageName}>
+          Save
+        </Button>
       </FormControlGroup>
 
       <hr />
@@ -101,7 +111,7 @@ const StorageEditPage = ({ storage }: StorageEditPageProps) => {
             so you can access useful features like document revision history,
             public APIs, document public sharing, 2000 tools integration and
             more. Please click{' '}
-            <a
+            <InlineLink
               onClick={(event) => {
                 event.preventDefault()
                 openNew(boostHubLearnMorePageUrl)
@@ -109,13 +119,13 @@ const StorageEditPage = ({ storage }: StorageEditPageProps) => {
               href={boostHubLearnMorePageUrl}
             >
               here
-            </a>{' '}
+            </InlineLink>{' '}
             to check it out.
           </li>
           <li>
             Some features are limited based on your pricing plan. Please try Pro
             trial to access all of them for one week for free. Check our{' '}
-            <a
+            <InlineLink
               onClick={(event) => {
                 event.preventDefault()
                 openNew(boostHubPricingPageUrl)
@@ -123,20 +133,24 @@ const StorageEditPage = ({ storage }: StorageEditPageProps) => {
               href={boostHubPricingPageUrl}
             >
               pricing plan
-            </a>{' '}
+            </InlineLink>{' '}
             to know more.
           </li>
           <li>
             Migrated documents will not be counted to the document limitation of
             free plan. Please try out a cloud space today!
           </li>
+          <li>
+            After migration, you will receive an 1 month free trial coupon for
+            the cloud space.
+          </li>
         </ol>
       </Alert>
 
       <FormGroup>
-        <FormPrimaryButton onClick={() => openTab('migration')}>
+        <Button variant={'primary'} onClick={() => openTab('migration')}>
           Start Migration
-        </FormPrimaryButton>
+        </Button>
       </FormGroup>
 
       {storage.type === 'fs' && (
@@ -160,9 +174,10 @@ const StorageEditPage = ({ storage }: StorageEditPageProps) => {
 
       <FormHeading depth={2}>Remove Space</FormHeading>
       <p>
+        {/*todo: Should be removed once pouch DB no longer active */}
         {storage.type !== 'fs' ? (
           <>
-            This will permantly remove all notes locally stored in this space.
+            This will permanently remove all notes locally stored in this space.
           </>
         ) : (
           <>
@@ -171,10 +186,27 @@ const StorageEditPage = ({ storage }: StorageEditPageProps) => {
           </>
         )}
         &nbsp;
-        <InlineLinkButton onClick={removeCallback}>Remove</InlineLinkButton>
+        <InlineLinkButton>
+          <Button
+            className={'storage__tab__link'}
+            variant={'link'}
+            onClick={removeCallback}
+          >
+            Remove
+          </Button>
+        </InlineLinkButton>
       </p>
     </div>
   )
 }
+
+const InlineLinkButton = styled.a`
+  .storage__tab__link {
+    cursor: pointer;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+`
 
 export default StorageEditPage

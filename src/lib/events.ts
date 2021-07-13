@@ -1,5 +1,5 @@
 import { ChangeEventHandler } from 'react'
-import { SidebarState } from './v2/sidebar'
+import { SerializedSubscription } from '../cloud/interfaces/db/subscription'
 
 export type SelectChangeEventHandler = ChangeEventHandler<HTMLSelectElement>
 
@@ -127,15 +127,43 @@ export const boostHubToggleSidebarSearchEventEmitter = createCustomEventEmitter(
 export const boostHubToggleSidebarTimelineEventEmitter = createCustomEventEmitter(
   'BoostHub:toggleSidebarTimeline'
 )
+export const boostHubToggleSidebarNotificationsEventEmitter = createCustomEventEmitter(
+  'BoostHub:toggleSidebarNotifications'
+)
 export const boostHubToggleSettingsMembersEventEmitter = createCustomEventEmitter(
   'BoostHub:toggleSettingsMembers'
 )
 
-export const boostHubOpenImportModalEventEmitter = createCustomEventEmitter(
-  'BoostHub:openImportModal'
+export const boostHubOpenDiscountModalEventEmitter = createCustomEventEmitter(
+  'BoostHub:openDiscountModal'
 )
 
-export type boostHubSidebarStateEvent = CustomEvent<{ state: SidebarState }>
-export const boostHubSidebarStateEventEmitter = createCustomEventEmitter<{
-  state: SidebarState
-}>('BoostHub:sidebarStateUpdate')
+export const boosthubNotificationCountsEventEmitter = createCustomEventEmitter<
+  Record<string, number>
+>('BoostHub:notificationCounts')
+
+type BoostHubSubscriptionEventDetail = { subscription: SerializedSubscription }
+
+export type BoostHubSubscriptionUpdateEvent = CustomEvent<
+  BoostHubSubscriptionEventDetail
+>
+export const boostHubSubscriptionUpdateEventEmitter = createCustomEventEmitter<
+  BoostHubSubscriptionEventDetail
+>('BoostHub:subscriptionUpdate')
+
+export type BoostHubSubscriptionDeleteEvent = CustomEvent<
+  BoostHubSubscriptionEventDetail
+>
+export const boostHubSubscriptionDeleteEventEmitter = createCustomEventEmitter<
+  BoostHubSubscriptionEventDetail
+>('BoostHub:subscriptionDelete')
+
+export const boostHubSidebarSpaceEventEmitter = createCustomEventEmitter(
+  'BoostHub:sidebarSpace'
+)
+
+export type BoostHubAppRouterEventDetail = { target: 'back' | 'forward' }
+export type BoostHubAppRouterEvent = CustomEvent<BoostHubAppRouterEventDetail>
+export const boostHubAppRouterEventEmitter = createCustomEventEmitter<
+  BoostHubAppRouterEventDetail
+>('BoostHub:appRouter')

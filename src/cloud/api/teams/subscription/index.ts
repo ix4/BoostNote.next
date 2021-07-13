@@ -74,23 +74,14 @@ export async function cancelSubscription(teamId: string) {
   return data
 }
 
-export async function reactivateSubscription(
-  teamId: string,
-  body: WithPromoCode
-) {
-  const data = await callApi<ReactivateSubscriptionResponseBody>(
-    `api/teams/${teamId}/subscription/reactivate`,
-    { method: 'post', json: body }
-  )
-  report('create_sub')
-  return data
-}
-
 export async function redeemPromo(teamId: string, body: WithPromoCode) {
-  await callApi(`api/teams/${teamId}/subscription/redeem`, {
+  const data = await callApi(`api/teams/${teamId}/subscription/redeem`, {
     method: 'post',
     json: body,
   })
+  return data as {
+    subscription: SerializedSubscription
+  }
 }
 
 export async function getPromo(teamId: string, key: string) {

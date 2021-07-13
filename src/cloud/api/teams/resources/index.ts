@@ -1,34 +1,11 @@
-import { SerializedTeam } from '../../../interfaces/db/team'
 import { SerializedFolderWithBookmark } from '../../../interfaces/db/folder'
 import { SerializedDocWithBookmark } from '../../../interfaces/db/doc'
 import querystring from 'querystring'
 import { SerializedTag } from '../../../interfaces/db/tag'
 import { SerializedWorkspace } from '../../../interfaces/db/workspace'
 import { callApi } from '../../../lib/client'
-
-export interface GetTiedResourcesRequestBody {
-  folderIds: string[]
-}
-
-export interface GetTiedResourcesResponseBody {
-  folders: SerializedFolderWithBookmark[]
-  docs: SerializedDocWithBookmark[]
-}
-
-export async function getTiedResources(
-  team: SerializedTeam,
-  body: GetTiedResourcesRequestBody
-) {
-  const data = await callApi<GetTiedResourcesResponseBody>(
-    `api/teams/${team.id}/resources/tied`,
-    {
-      search: querystring.stringify({
-        folderIds: body.folderIds,
-      }),
-    }
-  )
-  return data
-}
+import { SerializedSmartFolder } from '../../../interfaces/db/smartFolder'
+import { SerializedAppEvent } from '../../../interfaces/db/appEvents'
 
 export interface MoveResourceRequestBody {
   targetedResourceId: string
@@ -64,6 +41,8 @@ export interface GetResourcesResponseBody {
   docs: SerializedDocWithBookmark[]
   workspaces: SerializedWorkspace[]
   tags?: SerializedTag[]
+  smartFolders?: SerializedSmartFolder[]
+  appEvents?: SerializedAppEvent[]
 }
 
 export async function getResources(

@@ -1,11 +1,6 @@
-import React, { useState, useCallback, useMemo } from 'react'
-import { useModal } from '../../../../../lib/stores/modal'
+import React, { useState, useCallback, useMemo, useRef } from 'react'
 import { usePage } from '../../../../../lib/stores/pageStore'
-import { ModalBody, ModalContainer, ModalLine, ModaLineHeader } from '../styled'
-import CustomButton from '../../../../atoms/buttons/CustomButton'
-import { Spinner } from '../../../../atoms/Spinner'
 import ErrorBlock from '../../../../atoms/ErrorBlock'
-import { StyledModalForm, StyledModalFormInput } from '../Forms/styled'
 import { SerializedWorkspace } from '../../../../../interfaces/db/workspace'
 import { useGlobalData } from '../../../../../lib/stores/globalData'
 import { SerializedUserTeamPermissions } from '../../../../../interfaces/db/userTeamPermissions'
@@ -17,10 +12,17 @@ import {
 } from '../../../../../api/teams/workspaces'
 import { SerializedTeam } from '../../../../../interfaces/db/team'
 import { useNav } from '../../../../../lib/stores/nav'
-import Flexbox from '../../../../atoms/Flexbox'
-import CustomSwitch from '../../../../atoms/CustomSwitch'
 import WorkspaceAccess from './WorkspaceAccess'
-import { useToast } from '../../../../../../lib/v2/stores/toast'
+import { useToast } from '../../../../../../shared/lib/stores/toast'
+import { useModal } from '../../../../../../shared/lib/stores/modal'
+import Button, {
+  LoadingButton,
+} from '../../../../../../shared/components/atoms/Button'
+import Form from '../../../../../../shared/components/molecules/Form'
+import { useI18n } from '../../../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../../../lib/i18n/types'
+import FormRow from '../../../../../../shared/components/molecules/Form/templates/FormRow'
+import { useEffectOnce } from 'react-use'
 
 interface WorkspaceModalFormProps {
   workspace?: SerializedWorkspace
@@ -32,8 +34,9 @@ const WorkspaceModalForm = ({ workspace }: WorkspaceModalFormProps) => {
     globalData: { currentUser },
   } = useGlobalData()
   const { pushMessage } = useToast()
-  const { closeModal } = useModal()
+  const { closeLastModal } = useModal()
   const { updateWorkspacesMap } = useNav()
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const [error, setError] = useState<unknown>()
   const [sending, setSending] = useState<boolean>(false)
@@ -52,7 +55,13 @@ const WorkspaceModalForm = ({ workspace }: WorkspaceModalFormProps) => {
         )
       : []
   )
-  const formRef = React.createRef<HTMLDivElement>()
+  const { translate } = useI18n()
+
+  useEffectOnce(() => {
+    if (inputRef.current != null) {
+      inputRef.current.focus()
+    }
+  })
 
   const togglePrivate = useCallback(() => {
     setIsPublic((prev) => {
@@ -141,19 +150,19 @@ const WorkspaceModalForm = ({ workspace }: WorkspaceModalFormProps) => {
       setSending(true)
       try {
         if (body.name.trim() === '') {
-          throw new Error('Workspace name has to be filled.')
+          throw new Error('Folder name has to be filled.')
         }
         if (workspace != null) {
           await submitEditWorkSpaceHandler(team, workspace, body)
           pushMessage({
             title: 'Success',
-            description: 'Your workspace has been updated',
+            description: 'Your folder has been updated',
             type: 'success',
           })
         } else {
           await submitCreateWorkSpaceHandler(team, body)
         }
-        closeModal()
+        closeLastModal()
       } catch (error) {
         setError(error)
       } finally {
@@ -162,7 +171,7 @@ const WorkspaceModalForm = ({ workspace }: WorkspaceModalFormProps) => {
     },
     [
       name,
-      closeModal,
+      closeLastModal,
       pushMessage,
       selectedPermissions,
       submitCreateWorkSpaceHandler,
@@ -174,82 +183,85 @@ const WorkspaceModalForm = ({ workspace }: WorkspaceModalFormProps) => {
   )
 
   if (currentUser == null) {
-    return <ModalContainer>You need to be connected.</ModalContainer>
+    return <p>You need to be connected.</p>
   }
 
   if (team == null) {
-    return <ModalContainer>You need to select a valid team.</ModalContainer>
+    return <p>You need to select a valid team.</p>
   }
 
   return (
-    <ModalBody ref={formRef} tabIndex={0}>
-      <StyledModalForm onSubmit={onSubmit}>
-        <ModalLine>
-          <ModaLineHeader>Name</ModaLineHeader>
-        </ModalLine>
-        <ModalLine className='svg-initial-style' style={{ marginBottom: 30 }}>
-          <StyledModalFormInput
-            placeholder='Workspace name'
-            value={name}
-            onChange={onChangeWorkspaceNameHandler}
-          />
-        </ModalLine>
+    <Form onSubmit={onSubmit} fullWidth={true}>
+      <FormRow
+        fullWidth={true}
+        row={{
+          title: translate(lngKeys.GeneralName),
+          items: [
+            {
+              type: 'input',
+              props: {
+                ref: inputRef,
+                placeholder: translate(lngKeys.GeneralName),
+                value: name,
+                onChange: onChangeWorkspaceNameHandler,
+              },
+            },
+          ],
+        }}
+      />
+      {workspace != null && workspace.default ? (
+        <FormRow
+          row={{
+            title: translate(lngKeys.ModalsWorkspaceAccess),
+            description: translate(lngKeys.ModalsWorkspaceDefaultDisclaimer),
+          }}
+        />
+      ) : (
+        <FormRow
+          row={{
+            title: translate(lngKeys.ModalsWorkspaceMakePrivate),
+            items: [
+              {
+                type: 'node',
+                element: (
+                  <small>
+                    {isPublic
+                      ? translate(lngKeys.ModalsWorkspacePublicDisclaimer)
+                      : `${translate(
+                          lngKeys.ModalsWorkspacePrivateDisclaimer
+                        )} ${
+                          isOwner != null
+                            ? translate(lngKeys.ModalsWorkspacePrivateOwner)
+                            : ''
+                        }`}
+                  </small>
+                ),
+              },
+              {
+                type: 'switch',
+                props: {
+                  disabled:
+                    sending ||
+                    (workspace != null && workspace.default) ||
+                    !isOwner,
+                  id: 'make-private-switch',
+                  onChange: togglePrivate,
+                  checked: !isPublic,
+                },
+              },
+            ],
+          }}
+        />
+      )}
 
-        {workspace != null && workspace.default ? (
-          <>
-            <ModalLine>
-              <ModaLineHeader>Access</ModaLineHeader>
-            </ModalLine>
-            <ModalLine style={{ marginBottom: 30 }}>
-              <span>
-                This default workspace is public and can&apos;t have its access
-                modified.
-              </span>
-            </ModalLine>
-          </>
-        ) : (
-          <>
-            <ModalLine>
-              <ModaLineHeader>Make private</ModaLineHeader>
-            </ModalLine>
-            <ModalLine style={{ marginBottom: 30 }}>
-              <Flexbox justifyContent='space-between'>
-                {isPublic ? (
-                  <span>
-                    This workspace is public. Anyone from the team can access it
-                  </span>
-                ) : (
-                  <span>
-                    This workspace is private.{' '}
-                    {isOwner && 'You can set individual member access below.'}
-                  </span>
-                )}
-                <Flexbox flex='0 0 auto'>
-                  <CustomSwitch
-                    disabled={
-                      sending ||
-                      (workspace != null && workspace.default) ||
-                      !isOwner
-                    }
-                    id='make-private-switch'
-                    onChange={togglePrivate}
-                    checked={!isPublic}
-                    height={28}
-                    width={60}
-                    uncheckedIcon={false}
-                    checkedIcon={false}
-                  />
-                </Flexbox>
-              </Flexbox>
-            </ModalLine>{' '}
-          </>
-        )}
+      {!isOwner && (
+        <div className='form__row'>
+          <small>{translate(lngKeys.ModalsWorkspacesNonOwnerDisclaimer)}</small>
+        </div>
+      )}
 
-        {!isOwner && (
-          <small>Only the workspace owner can change its access.</small>
-        )}
-
-        {!isPublic && (
+      {!isPublic && (
+        <div className='form__row'>
           <WorkspaceAccess
             permissions={permissions}
             ownerPermissions={ownerPermissions}
@@ -258,42 +270,31 @@ const WorkspaceModalForm = ({ workspace }: WorkspaceModalFormProps) => {
             setSelectedPermissions={setSelectedPermissions}
             currentUser={currentUser}
           />
-        )}
+        </div>
+      )}
 
-        {error != null && (
-          <ModalLine>
-            <ErrorBlock
-              error={error}
-              style={{ margin: 0, width: '100%', marginTop: 20 }}
-            />
-          </ModalLine>
-        )}
-        <ModalLine className='justify-end svg-initial-style'>
-          <CustomButton
-            variant='transparent'
-            className='rounded mr-2 size-l'
-            onClick={closeModal}
-            type='button'
-          >
-            Cancel
-          </CustomButton>
-          <CustomButton
-            variant='primary'
-            className='rounded size-l'
-            type='submit'
-            disabled={sending}
-          >
-            {sending ? (
-              <Spinner size={16} style={{ fontSize: 16, marginRight: 0 }} />
-            ) : workspace != null ? (
-              'Update'
-            ) : (
-              'Create'
-            )}
-          </CustomButton>
-        </ModalLine>
-      </StyledModalForm>
-    </ModalBody>
+      {error != null && (
+        <div className='form__row'>
+          <ErrorBlock error={error} style={{ margin: 0, width: '100%' }} />
+        </div>
+      )}
+
+      <div className='form__row'>
+        <Button variant='secondary' onClick={closeLastModal}>
+          {translate(lngKeys.GeneralCancel)}
+        </Button>
+        <LoadingButton
+          spinning={sending}
+          variant='primary'
+          type='submit'
+          disabled={sending}
+        >
+          {workspace != null
+            ? translate(lngKeys.GeneralUpdateVerb)
+            : translate(lngKeys.GeneralCreate)}
+        </LoadingButton>
+      </div>
+    </Form>
   )
 }
 

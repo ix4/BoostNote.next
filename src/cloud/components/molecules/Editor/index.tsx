@@ -12,14 +12,17 @@ import attachFileHandlerToCodeMirrorEditor, {
   OnFileCallback,
 } from '../../../lib/editor/plugins/fileHandler'
 import { uploadFile, buildTeamFileUrl } from '../../../api/teams/files'
-import { YText } from 'yjs/dist/src/internals'
+import {
+  createRelativePositionFromTypeIndex,
+  createAbsolutePositionFromRelativePosition,
+} from 'yjs'
 import {
   useGlobalKeyDownHandler,
   preventKeyboardEventPropagation,
 } from '../../../lib/keyboard'
 import { SerializedTeam } from '../../../interfaces/db/team'
 import { isEditSessionSaveShortcut } from '../../../lib/shortcuts'
-import { getDocTitle, getTeamURL, getDocURL } from '../../../lib/utils/patterns'
+import { getDocTitle } from '../../../lib/utils/patterns'
 import { SerializedUser } from '../../../interfaces/db/user'
 import EditorToolbar from './EditorToolbar'
 import { usePreferences } from '../../../lib/stores/preferences'
@@ -40,26 +43,25 @@ import {
   mdiFileDocumentOutline,
   mdiStar,
   mdiStarOutline,
-  mdiChevronLeft,
-  mdiChevronRight,
   mdiPencil,
   mdiEyeOutline,
   mdiViewSplitVertical,
+  mdiCommentTextOutline,
+  mdiFormatListBulleted,
 } from '@mdi/js'
 import EditorToolButton from './EditorToolButton'
 import { not } from 'ramda'
 import EditorToolbarUpload from './EditorToolbarUpload'
 import { useNav } from '../../../lib/stores/nav'
 import { Hint } from 'codemirror'
-import { EmbedDoc } from '../../../lib/docEmbedPlugin'
 import { SerializedTemplate } from '../../../interfaces/db/template'
 import TemplatesModal from '../../organisms/Modal/contents/TemplatesModal'
-import { useModal } from '../../../lib/stores/modal'
 import EditorSelectionStatus from './EditorSelectionStatus'
 import EditorIndentationStatus from './EditorIndentationStatus'
 import EditorKeyMapSelect from './EditorKeyMapSelect'
 import EditorThemeSelect from './EditorThemeSelect'
-import DocContextMenu from '../../organisms/Topbar/Controls/ControlsContextMenu/DocContextMenu'
+//import DocContextMenu from '../../organisms/Topbar/Controls/ControlsContextMenu/DocContextMenu'
+import DocContextMenu from '../../organisms/EditorLayout/NewDocContextMenu'
 import {
   focusTitleEventEmitter,
   focusEditorEventEmitter,
@@ -68,15 +70,29 @@ import {
 } from '../../../lib/utils/events'
 import { ScrollSync, scrollSyncer } from '../../../lib/editor/scrollSync'
 import CodeMirrorEditor from '../../../lib/editor/components/CodeMirrorEditor'
-import MarkdownView from '../../atoms/MarkdownView'
+import MarkdownView, { SelectionContext } from '../../atoms/MarkdownView'
 import { usePage } from '../../../lib/stores/pageStore'
-import { useToast } from '../../../../lib/v2/stores/toast'
-import { mapTopbarBreadcrumbs } from '../../../../lib/v2/mappers/cloud/topbarBreadcrumbs'
-import { useCloudUpdater } from '../../../../lib/v2/hooks/cloud/useCloudUpdater'
-import { LoadingButton } from '../../../../components/v2/atoms/Button'
+import { useToast } from '../../../../shared/lib/stores/toast'
+import { LoadingButton } from '../../../../shared/components/atoms/Button'
 import { trackEvent } from '../../../api/track'
 import { MixpanelActionTrackTypes } from '../../../interfaces/analytics/mixpanel'
-import { useCloudUI } from '../../../../lib/v2/hooks/cloud/useCloudUI'
+import { useCloudApi } from '../../../lib/hooks/useCloudApi'
+import { useCloudResourceModals } from '../../../lib/hooks/useCloudResourceModals'
+import { mapTopbarBreadcrumbs } from '../../../lib/mappers/topbarBreadcrumbs'
+import { useModal } from '../../../../shared/lib/stores/modal'
+import PresenceIcons from '../../organisms/Topbar/PresenceIcons'
+import { TopbarControlProps } from '../../../../shared/components/organisms/Topbar'
+import Icon from '../../atoms/Icon'
+import CommentManager from '../../organisms/CommentManager'
+import useCommentManagerState from '../../../lib/hooks/useCommentManagerState'
+import { HighlightRange } from '../../../lib/rehypeHighlight'
+import { getDocLinkHref } from '../../atoms/Link/DocLink'
+import throttle from 'lodash.throttle'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
+import { parse } from 'querystring'
+import DocShare from '../DocShare'
+import EditorLayout from '../../organisms/EditorLayout'
 
 type LayoutMode = 'split' | 'preview' | 'editor'
 
@@ -102,27 +118,24 @@ interface SelectionState {
   }[]
 }
 
-const Editor = ({
-  doc,
-  team,
-  user,
-  contributors,
-  backLinks,
-  revisionHistory,
-}: EditorProps) => {
-  const { currentUserPermissions } = usePage()
+const Editor = ({ doc, team, user, contributors, backLinks }: EditorProps) => {
+  const { translate } = useI18n()
+  const { currentUserPermissions, permissions } = usePage()
   const { pushMessage, pushApiErrorMessage } = useToast()
   const [color] = useState(() => getColorFromString(user.id))
   const { preferences, setPreferences } = usePreferences()
   const editorRef = useRef<CodeMirror.Editor | null>(null)
-  const [initialSyncDone, setInitialSyncDone] = useState(false)
+  const [initialLoadDone, setInitialLoadDone] = useState(false)
   const fileUploadHandlerRef = useRef<OnFileCallback>()
-  const [editorLayout, setEditorLayout] = useState<LayoutMode>('preview')
-  const [title, setTitle] = useState(getDocTitle(doc))
-  const previousTitle = useRef<string>()
+  const [editorLayout, setEditorLayout] = useState<LayoutMode>(
+    preferences.lastEditorMode != 'preview'
+      ? preferences.lastEditorEditLayout
+      : 'preview'
+  )
   const [editorContent, setEditorContent] = useState('')
   const docRef = useRef<string>('')
-  const { state, push } = useRouter()
+  const router = useRouter()
+  const { state, push } = router
   const [shortcodeConvertMenu, setShortcodeConvertMenu] = useState<{
     pos: PositionRange
     cb: Callback
@@ -147,10 +160,19 @@ const Editor = ({
       },
     ],
   })
-  const { docsMap, workspacesMap, foldersMap } = useNav()
+  const { docsMap, workspacesMap, foldersMap, loadDoc } = useNav()
   const suggestionsRef = useRef<Hint[]>([])
-  const { sendingMap, toggleDocBookmark } = useCloudUpdater()
-  const { openRenameDocForm, openRenameFolderForm } = useCloudUI()
+  const { sendingMap, toggleDocBookmark } = useCloudApi()
+  const {
+    openRenameDocForm,
+    openRenameFolderForm,
+    openNewFolderForm,
+    openNewDocForm,
+    openWorkspaceEditForm,
+    deleteDoc,
+    deleteFolder,
+    deleteWorkspace,
+  } = useCloudResourceModals()
 
   const userInfo = useMemo(() => {
     return {
@@ -167,27 +189,196 @@ const Editor = ({
     userInfo,
   })
 
-  useEffect(() => {
-    if (previousTitle.current !== doc.head?.title) {
-      setTitle(getDocTitle(doc))
-      previousTitle.current = doc.head?.title
-    }
-  }, [doc])
+  const [commentState, commentActions] = useCommentManagerState(doc.id)
 
-  const docIsNew = !!state.new
+  useEffect(() => {
+    const { thread } = parse(router.search.slice(1))
+    const threadId = Array.isArray(thread) ? thread[0] : thread
+    if (threadId != null) {
+      commentActions.setMode({ mode: 'thread', thread: { id: threadId } })
+      setPreferences({ docContextMode: 'comment' })
+    }
+  }, [router, commentActions, setPreferences])
+
+  const normalizedCommentState = useMemo(() => {
+    if (commentState.mode === 'list_loading' || permissions == null) {
+      return commentState
+    }
+
+    const normalizedState = { ...commentState }
+
+    const updatedUsers = new Map(
+      permissions.map((permission) => [permission.user.id, permission.user])
+    )
+
+    normalizedState.threads = normalizedState.threads.map((thread) => {
+      if (thread.status.by == null) {
+        return thread
+      }
+      const normalizedUser =
+        updatedUsers.get(thread.status.by.id) || thread.status.by
+
+      return { ...thread, status: { ...thread.status, by: normalizedUser } }
+    })
+
+    if (normalizedState.mode === 'thread') {
+      if (normalizedState.thread.status.by != null) {
+        const normalizedUser =
+          updatedUsers.get(normalizedState.thread.status.by.id) ||
+          normalizedState.thread.status.by
+        normalizedState.thread = {
+          ...normalizedState.thread,
+          status: { ...normalizedState.thread.status, by: normalizedUser },
+        }
+      }
+
+      normalizedState.comments = normalizedState.comments.map((comment) => {
+        const normalizedUser = updatedUsers.get(comment.user.id) || comment.user
+        return { ...comment, user: normalizedUser }
+      })
+    }
+
+    return normalizedState
+  }, [commentState, permissions])
+
+  const users = useMemo(() => {
+    if (permissions == null) {
+      return []
+    }
+
+    return permissions.map((permission) => permission.user)
+  }, [permissions])
+
+  const newRangeThread = useCallback(
+    (selection: SelectionContext) => {
+      if (realtime == null) {
+        return
+      }
+      const text = realtime.doc.getText('content')
+      const anchor = createRelativePositionFromTypeIndex(text, selection.start)
+      const head = createRelativePositionFromTypeIndex(text, selection.end)
+      setPreferences({ docContextMode: 'comment' })
+      commentActions.setMode({
+        mode: 'new_thread',
+        context: selection.text,
+        selection: {
+          anchor,
+          head,
+        },
+      })
+    },
+    [realtime, commentActions, setPreferences]
+  )
+
+  const [viewComments, setViewComments] = useState<HighlightRange[]>([])
+  const calculatePositions = useCallback(() => {
+    if (commentState.mode === 'list_loading' || realtime == null) {
+      return
+    }
+
+    const comments: HighlightRange[] = []
+    for (const thread of commentState.threads) {
+      if (thread.selection != null && thread.status.type !== 'outdated') {
+        const absoluteAnchor = createAbsolutePositionFromRelativePosition(
+          thread.selection.anchor,
+          realtime.doc
+        )
+        const absoluteHead = createAbsolutePositionFromRelativePosition(
+          thread.selection.head,
+          realtime.doc
+        )
+
+        if (
+          absoluteAnchor != null &&
+          absoluteHead != null &&
+          absoluteAnchor.index !== absoluteHead.index
+        ) {
+          if (thread.status.type === 'open') {
+            comments.push({
+              id: thread.id,
+              start: absoluteAnchor.index,
+              end: absoluteHead.index,
+              active:
+                commentState.mode === 'thread' &&
+                thread.id === commentState.thread.id,
+            })
+          }
+        } else if (connState === 'synced') {
+          commentActions.threadOutdated(thread)
+        }
+      }
+    }
+    setViewComments(comments)
+  }, [commentState, realtime, commentActions, connState])
+
+  useEffect(() => {
+    if (realtime != null) {
+      realtime.doc.on('update', calculatePositions)
+      return () => realtime.doc.off('update', calculatePositions)
+    }
+    return undefined
+  }, [realtime, calculatePositions])
+
+  useEffect(() => {
+    calculatePositions()
+  }, [calculatePositions])
+
+  const commentClick = useCallback(
+    (ids: string[]) => {
+      if (commentState.mode !== 'list_loading') {
+        const idSet = new Set(ids)
+        setPreferences({ docContextMode: 'comment' })
+        commentActions.setMode({
+          mode: 'list',
+          filter: (thread) => idSet.has(thread.id),
+        })
+      }
+    },
+    [commentState, commentActions, setPreferences]
+  )
+
+  const changeEditorLayout = useCallback(
+    (target: LayoutMode) => {
+      setEditorLayout(target)
+      if (target === 'preview') {
+        setPreferences({
+          lastEditorMode: 'preview',
+        })
+        return
+      }
+
+      setPreferences({
+        lastEditorMode: 'edit',
+        lastEditorEditLayout: target,
+      })
+    },
+    [setPreferences]
+  )
+
+  const docIsNew = !!state?.new
   useEffect(() => {
     if (docRef.current !== doc.id) {
       if (docIsNew) {
-        setEditorLayout(preferences.lastUsedLayout)
+        changeEditorLayout(preferences.lastEditorEditLayout)
         if (titleRef.current != null) {
           titleRef.current.focus()
         }
       } else {
-        setEditorLayout('preview')
+        setEditorLayout(
+          preferences.lastEditorMode === 'preview'
+            ? 'preview'
+            : preferences.lastEditorEditLayout
+        )
       }
       docRef.current = doc.id
     }
-  }, [doc.id, docIsNew, preferences.lastUsedLayout])
+  }, [
+    doc.id,
+    docIsNew,
+    preferences.lastEditorEditLayout,
+    preferences.lastEditorMode,
+    changeEditorLayout,
+  ])
 
   useEffect(() => {
     if (editorLayout === 'preview') {
@@ -200,7 +391,7 @@ const Editor = ({
   }, [editorLayout])
 
   useEffect(() => {
-    if (!initialSyncDone) {
+    if (!initialLoadDone) {
       return
     }
     if (editorRef.current != null) {
@@ -208,21 +399,7 @@ const Editor = ({
     } else if (titleRef.current != null) {
       titleRef.current.focus()
     }
-  }, [initialSyncDone, docIsNew])
-
-  const changeEditorLayout = useCallback(
-    (target: LayoutMode) => {
-      setEditorLayout(target)
-      if (target === 'preview') {
-        return
-      }
-
-      setPreferences({
-        lastUsedLayout: target,
-      })
-    },
-    [setPreferences]
-  )
+  }, [initialLoadDone, docIsNew])
 
   const editPageKeydownHandler = useMemo(() => {
     return (event: KeyboardEvent) => {
@@ -257,51 +434,15 @@ const Editor = ({
 
   useEffect(() => {
     return () => {
-      setInitialSyncDone(false)
+      setInitialLoadDone(false)
     }
   }, [doc.id])
 
   useEffect(() => {
-    if (connState === 'synced') {
-      setInitialSyncDone(true)
+    if (connState === 'synced' || connState === 'loaded') {
+      setInitialLoadDone(true)
     }
   }, [connState])
-
-  const titleChangeCallback = useCallback(
-    (newTitle: string) => {
-      if (realtime == null) {
-        return
-      }
-
-      const realtimeTitle = realtime.doc.getText('title') as YText
-      // TODO: switch to delta diff implementation
-      realtimeTitle.delete(0, realtimeTitle.toString().length)
-      realtimeTitle.insert(0, newTitle)
-      //--------
-    },
-    [realtime]
-  )
-
-  useEffect(() => {
-    if (realtime == null) {
-      return
-    }
-
-    const titleYText = realtime.doc.getText('title') as YText
-    const realtimeTitle = titleYText.toString()
-    setTitle(realtimeTitle)
-
-    titleYText.observe((textEvent, _transac) => {
-      // TODO: switch to delta diff implementation
-      const delta = textEvent.delta[0]
-      if (delta == null || delta['insert'] == null) {
-        return setTitle('')
-      }
-      setTitle(delta['insert'])
-      //--------
-    })
-    return
-  }, [realtime, setTitle])
 
   useEffect(() => {
     suggestionsRef.current = Array.from(docsMap.values()).map((doc) => {
@@ -410,19 +551,26 @@ const Editor = ({
         })
       }
     })
-    editor.on('cursorActivity', (codeMirror: CodeMirror.Editor) => {
-      const doc = codeMirror.getDoc()
-      const { line, ch } = doc.getCursor()
-      const selections = doc.listSelections()
+    editor.on(
+      'cursorActivity',
+      throttle(
+        (codeMirror: CodeMirror.Editor) => {
+          const doc = codeMirror.getDoc()
+          const { line, ch } = doc.getCursor()
+          const selections = doc.listSelections()
 
-      setSelection({
-        currentCursor: {
-          line,
-          ch,
+          setSelection({
+            currentCursor: {
+              line,
+              ch,
+            },
+            currentSelections: selections,
+          })
         },
-        currentSelections: selections,
-      })
-    })
+        500,
+        { trailing: true }
+      )
+    )
   }, [])
 
   useEffect(() => {
@@ -436,14 +584,9 @@ const Editor = ({
       if (editorRef.current == null || realtime == null) {
         return
       }
-      setTitle(template.title)
-      const realtimeTitle = realtime.doc.getText('title') as YText
-      // TODO: switch to delta diff implementation
-      realtimeTitle.delete(0, realtimeTitle.toString().length)
-      realtimeTitle.insert(0, template.title)
       editorRef.current.setValue(template.content)
     },
-    [setTitle, realtime]
+    [realtime]
   )
 
   const { settings } = useSettings()
@@ -500,19 +643,17 @@ const Editor = ({
       if (realtime == null) {
         return
       }
-      const realtimeTitle = realtime.doc.getText('title') as YText
+      const realtimeTitle = realtime.doc.getText('title')
       realtimeTitle.delete(0, realtimeTitle.toString().length)
-      realtimeTitle.insert(0, rev.title)
       setEditorRefContent(rev.content)
     },
     [realtime, setEditorRefContent]
   )
 
-  const { openModal } = useModal()
+  const { openModal, openContextModal } = useModal()
   const onEditorTemplateToolClick = useCallback(() => {
     openModal(<TemplatesModal callback={onTemplatePickCallback} />, {
-      classNames: 'size-XL',
-      closable: false,
+      width: 'large',
     })
   }, [openModal, onTemplatePickCallback])
 
@@ -520,25 +661,25 @@ const Editor = ({
     setScrollSync(not)
   }, [])
 
-  const embeddableDocs = useMemo(() => {
-    const embedMap = new Map<string, EmbedDoc>()
-    if (team == null) {
-      return embedMap
-    }
-
-    for (const doc of docsMap.values()) {
-      if (doc.head != null) {
-        const current = `${location.protocol}//${location.host}`
-        const link = `${current}${getTeamURL(team)}${getDocURL(doc)}`
-        embedMap.set(doc.id, {
-          title: doc.head.title,
-          content: doc.head.content,
-          link,
-        })
+  const getEmbed = useCallback(
+    async (id: string) => {
+      if (team == null) {
+        return undefined
       }
-    }
-    return embedMap
-  }, [docsMap, team])
+      const doc = await loadDoc(id, team.id)
+      if (doc == null) {
+        return undefined
+      }
+      const current = `${location.protocol}//${location.host}`
+      const link = `${current}${getDocLinkHref(doc, team, 'index')}`
+      return {
+        title: doc.title,
+        content: doc.head != null ? doc.head.content : '',
+        link,
+      }
+    },
+    [loadDoc, team]
+  )
 
   const shortcodeConvertMenuStyle: React.CSSProperties = useMemo(() => {
     if (shortcodeConvertMenu == null || editorRef.current == null) {
@@ -601,6 +742,7 @@ const Editor = ({
 
   const breadcrumbs = useMemo(() => {
     const breadcrumbs = mapTopbarBreadcrumbs(
+      translate,
       team,
       foldersMap,
       workspacesMap,
@@ -608,14 +750,21 @@ const Editor = ({
       {
         pageDoc: {
           ...doc,
-          head: { ...(doc.head || {}), title },
+          head: { ...(doc.head || {}) },
         } as SerializedDoc,
       },
       openRenameFolderForm,
-      (doc) => openRenameDocForm(doc, titleChangeCallback)
+      openRenameDocForm,
+      openNewDocForm,
+      openNewFolderForm,
+      openWorkspaceEditForm,
+      deleteDoc,
+      deleteFolder,
+      deleteWorkspace
     )
     return breadcrumbs
   }, [
+    translate,
     team,
     foldersMap,
     workspacesMap,
@@ -623,33 +772,45 @@ const Editor = ({
     push,
     openRenameDocForm,
     openRenameFolderForm,
-    titleChangeCallback,
-    title,
+    openNewFolderForm,
+    openNewDocForm,
+    deleteDoc,
+    deleteFolder,
+    openWorkspaceEditForm,
+    deleteWorkspace,
   ])
 
   const updateLayout = useCallback(
     (mode: LayoutMode) => {
+      if (editorLayout === 'preview' && mode !== 'preview') {
+        trackEvent(MixpanelActionTrackTypes.DocLayoutEdit, {
+          team: doc.teamId,
+          doc: doc.id,
+        })
+      }
+
       changeEditorLayout(mode)
     },
-    [changeEditorLayout]
+    [changeEditorLayout, doc.id, doc.teamId, editorLayout]
   )
 
   const toggleViewMode = useCallback(() => {
     if (editorLayout === 'preview') {
-      trackEvent(MixpanelActionTrackTypes.DocLayoutEdit, {
-        team: doc.teamId,
-        doc: doc.id,
-      })
-      updateLayout(preferences.lastUsedLayout)
+      changeEditorLayout(preferences.lastEditorEditLayout)
       return
     }
-    updateLayout('preview')
+
+    trackEvent(MixpanelActionTrackTypes.DocLayoutEdit, {
+      team: doc.teamId,
+      doc: doc.id,
+    })
+    changeEditorLayout('preview')
   }, [
-    updateLayout,
-    preferences.lastUsedLayout,
+    changeEditorLayout,
+    preferences.lastEditorEditLayout,
     editorLayout,
-    doc.id,
     doc.teamId,
+    doc.id,
   ])
 
   useEffect(() => {
@@ -670,7 +831,11 @@ const Editor = ({
     }
   }, [toggleSplitEditMode])
 
-  if (!initialSyncDone) {
+  const toggleBookmarkForDoc = useCallback(() => {
+    toggleDocBookmark(doc.teamId, doc.id, doc.bookmarked)
+  }, [toggleDocBookmark, doc.teamId, doc.id, doc.bookmarked])
+
+  if (!initialLoadDone) {
     return (
       <Application content={{}}>
         <StyledLoadingView>
@@ -689,31 +854,36 @@ const Editor = ({
         topbar: {
           breadcrumbs,
           children:
-            currentUserPermissions != null ? (
-              <LoadingButton
-                variant='icon'
-                disabled={sendingMap.has(doc.id)}
-                spinning={sendingMap.has(doc.id)}
-                size='sm'
-                iconPath={doc.bookmarked ? mdiStar : mdiStarOutline}
-                onClick={() =>
-                  toggleDocBookmark(doc.teamId, doc.id, doc.bookmarked)
-                }
-              />
+            !team.personal && currentUserPermissions != null ? (
+              <StyledTopbarChildrenContainer>
+                <LoadingButton
+                  variant='icon'
+                  disabled={sendingMap.has(doc.id)}
+                  spinning={sendingMap.has(doc.id)}
+                  size='sm'
+                  iconPath={doc.bookmarked ? mdiStar : mdiStarOutline}
+                  onClick={toggleBookmarkForDoc}
+                />
+
+                <PresenceIcons user={userInfo} users={otherUsers} />
+              </StyledTopbarChildrenContainer>
             ) : null,
           controls: [
+            {
+              type: 'separator',
+            },
             ...(connState === 'reconnecting'
               ? [
                   {
+                    type: 'button',
                     variant: 'secondary' as const,
                     disabled: true,
-                    label: 'Connecting...',
+                    label: translate(lngKeys.EditorReconnectAttempt),
                     tooltip: (
                       <>
-                        Attempting auto-reconnection
+                        {translate(lngKeys.EditorReconnectAttempt1)}
                         <br />
-                        Changes will not be synced with the server until
-                        reconnection
+                        {translate(lngKeys.EditorReconnectAttempt2)}
                       </>
                     ),
                   },
@@ -721,145 +891,197 @@ const Editor = ({
               : connState === 'disconnected'
               ? [
                   {
+                    type: 'button',
                     variant: 'warning' as const,
                     onClick: () => realtime.connect(),
-                    label: 'Reconnect',
+                    label: translate(lngKeys.EditorReconnectDisconnected),
                     tooltip: (
                       <>
-                        Please try reconnecting.
+                        {translate(lngKeys.EditorReconnectDisconnected1)}
                         <br />
-                        Changes will not be synced with the server until
-                        reconnection
+                        {translate(lngKeys.EditorReconnectDisconnected2)}
+                      </>
+                    ),
+                  },
+                ]
+              : connState === 'loaded'
+              ? [
+                  {
+                    type: 'button',
+                    variant: 'secondary' as const,
+                    disabled: true,
+                    label: translate(lngKeys.EditorReconnectSyncing),
+                    tooltip: (
+                      <>
+                        {translate(lngKeys.EditorReconnectSyncing1)}
+                        <br />
+                        {translate(lngKeys.EditorReconnectSyncing2)}
                       </>
                     ),
                   },
                 ]
               : []),
             {
+              type: 'button',
               variant: 'icon',
               iconPath: mdiPencil,
               active: editorLayout === 'editor',
               onClick: () => updateLayout('editor'),
             },
             {
+              type: 'button',
               variant: 'icon',
               iconPath: mdiViewSplitVertical,
               active: editorLayout === 'split',
               onClick: () => updateLayout('split'),
             },
             {
+              type: 'button',
               variant: 'icon',
               iconPath: mdiEyeOutline,
               active: editorLayout === 'preview',
               onClick: () => updateLayout('preview'),
             },
             {
-              variant: 'icon',
-              iconPath: !preferences.docContextIsHidden
-                ? mdiChevronLeft
-                : mdiChevronRight,
-              onClick: () =>
-                setPreferences({
-                  docContextIsHidden: !preferences.docContextIsHidden,
-                }),
+              type: 'separator',
             },
-          ],
+            {
+              type: 'button',
+              variant: 'secondary',
+              label: translate(lngKeys.Share),
+              onClick: (event) =>
+                openContextModal(
+                  event,
+                  <DocShare currentDoc={doc} team={team} />,
+                  { width: 440, alignment: 'bottom-right' }
+                ),
+            },
+            {
+              variant: 'icon',
+              iconPath: mdiFormatListBulleted,
+              active: preferences.docContextMode === 'context',
+              onClick: () =>
+                setPreferences(({ docContextMode }) => ({
+                  docContextMode:
+                    docContextMode === 'context' ? 'hidden' : 'context',
+                })),
+            },
+          ] as TopbarControlProps[],
         },
-        right: !preferences.docContextIsHidden ? (
-          <DocContextMenu
-            currentDoc={doc}
-            contributors={contributors}
-            backLinks={backLinks}
-            team={team}
-            editorRef={editorRef}
-            restoreRevision={onRestoreRevisionCallback}
-            revisionHistory={revisionHistory}
-            presence={{ user: userInfo, users: otherUsers, editorLayout }}
-            openRenameDocForm={() =>
-              openRenameDocForm(doc, titleChangeCallback)
-            }
-            sendingRename={sendingMap.has(doc.id)}
-          />
-        ) : null,
+        right:
+          preferences.docContextMode === 'context' ? (
+            <DocContextMenu
+              currentDoc={doc}
+              contributors={contributors}
+              backLinks={backLinks}
+              team={team}
+              restoreRevision={onRestoreRevisionCallback}
+              editorRef={editorRef}
+            />
+          ) : preferences.docContextMode === 'comment' ? (
+            <CommentManager
+              state={normalizedCommentState}
+              user={user}
+              users={users}
+              {...commentActions}
+            />
+          ) : null,
       }}
     >
-      <Container>
-        {editorLayout !== 'preview' && (
-          <StyledLayoutDimensions className={editorLayout}>
-            <ToolbarRow>
-              <EditorToolButton
-                tooltip={`${scrollSync ? 'Disable' : 'Enable'} scroll sync`}
-                path={scrollSync ? mdiRepeatOff : mdiRepeat}
-                onClick={toggleScrollSync}
-                className='scroll-sync'
-              />
-              <EditorToolbar
-                editorRef={editorRef}
-                team={team}
-                currentDoc={doc}
-              />
-              <EditorToolbarUpload
-                editorRef={editorRef}
-                fileUploadHandlerRef={fileUploadHandlerRef}
-              />
-              <EditorToolButton
-                tooltip='Use a template'
-                path={mdiFileDocumentOutline}
-                onClick={onEditorTemplateToolClick}
-              />
-            </ToolbarRow>
-          </StyledLayoutDimensions>
-        )}
-        <StyledEditor className={editorLayout}>
-          <StyledEditorWrapper className={`layout-${editorLayout}`}>
-            <>
-              <CodeMirrorEditor
-                bind={bindCallback}
-                config={editorConfig}
-                realtime={realtime}
-              />
-              {editorContent === '' && (
-                <EditorTemplateButton
-                  onTemplatePickCallback={onTemplatePickCallback}
+      <EditorLayout
+        doc={doc}
+        docIsEditable={true}
+        fullWidth={editorLayout !== 'preview'}
+        team={team}
+      >
+        <Container>
+          {editorLayout !== 'preview' && (
+            <StyledLayoutDimensions className={editorLayout}>
+              <ToolbarRow>
+                <EditorToolButton
+                  position={'bottom-right'}
+                  tooltip={
+                    scrollSync
+                      ? translate(lngKeys.EditorToolbarTooltipScrollSyncDisable)
+                      : translate(lngKeys.EditorToolbarTooltipScrollSyncEnable)
+                  }
+                  path={scrollSync ? mdiRepeatOff : mdiRepeat}
+                  onClick={toggleScrollSync}
+                  className='scroll-sync'
                 />
-              )}
-              {shortcodeConvertMenu !== null && (
-                <StyledShortcodeConvertMenu style={shortcodeConvertMenuStyle}>
-                  <button onClick={() => shortcodeConvertMenu.cb(false)}>
-                    Dismiss
-                  </button>
-                  <button onClick={() => shortcodeConvertMenu.cb(true)}>
-                    Create embed
-                  </button>
-                </StyledShortcodeConvertMenu>
-              )}
-            </>
-          </StyledEditorWrapper>
-          <StyledPreview className={`layout-${editorLayout}`}>
-            <MarkdownView
-              content={editorContent}
-              updateContent={setEditorRefContent}
-              headerLinks={editorLayout === 'preview'}
-              onRender={onRender.current}
-              className='scroller'
-              embeddableDocs={embeddableDocs}
-              scrollerRef={previewRef}
-            />
-          </StyledPreview>
-        </StyledEditor>
+                <EditorToolbar editorRef={editorRef} />
+                <EditorToolbarUpload
+                  editorRef={editorRef}
+                  fileUploadHandlerRef={fileUploadHandlerRef}
+                />
+                <EditorToolButton
+                  tooltip={translate(lngKeys.EditorToolbarTooltipTemplate)}
+                  path={mdiFileDocumentOutline}
+                  onClick={onEditorTemplateToolClick}
+                />
+              </ToolbarRow>
+            </StyledLayoutDimensions>
+          )}
+          <StyledEditor className={editorLayout}>
+            <StyledEditorWrapper className={`layout-${editorLayout}`}>
+              <>
+                <CodeMirrorEditor
+                  bind={bindCallback}
+                  config={editorConfig}
+                  realtime={realtime}
+                />
+                {editorContent === '' && (
+                  <EditorTemplateButton
+                    onTemplatePickCallback={onTemplatePickCallback}
+                  />
+                )}
+                {shortcodeConvertMenu !== null && (
+                  <StyledShortcodeConvertMenu style={shortcodeConvertMenuStyle}>
+                    <button onClick={() => shortcodeConvertMenu.cb(false)}>
+                      Dismiss
+                    </button>
+                    <button onClick={() => shortcodeConvertMenu.cb(true)}>
+                      Create embed
+                    </button>
+                  </StyledShortcodeConvertMenu>
+                )}
+              </>
+            </StyledEditorWrapper>
+            <StyledPreview className={`layout-${editorLayout}`}>
+              <MarkdownView
+                content={editorContent}
+                updateContent={setEditorRefContent}
+                headerLinks={editorLayout === 'preview'}
+                onRender={onRender.current}
+                className='scroller'
+                getEmbed={getEmbed}
+                scrollerRef={previewRef}
+                comments={viewComments}
+                commentClick={commentClick}
+                SelectionMenu={({ selection }) => (
+                  <StyledSelectionMenu>
+                    <div onClick={() => newRangeThread(selection)}>
+                      <Icon size={21} path={mdiCommentTextOutline} />
+                    </div>
+                  </StyledSelectionMenu>
+                )}
+              />
+            </StyledPreview>
+          </StyledEditor>
 
-        {editorLayout !== 'preview' && (
-          <StyledBottomBar>
-            <EditorSelectionStatus
-              cursor={selection.currentCursor}
-              selections={selection.currentSelections}
-            />
-            <EditorKeyMapSelect />
-            <EditorThemeSelect />
-            <EditorIndentationStatus />
-          </StyledBottomBar>
-        )}
-      </Container>
+          {editorLayout !== 'preview' && (
+            <StyledBottomBar>
+              <EditorSelectionStatus
+                cursor={selection.currentCursor}
+                selections={selection.currentSelections}
+              />
+              <EditorKeyMapSelect />
+              <EditorThemeSelect />
+              <EditorIndentationStatus />
+            </StyledBottomBar>
+          )}
+        </Container>
+      </EditorLayout>
     </Application>
   )
 }
@@ -870,6 +1092,13 @@ const Container = styled.div`
   flex-grow: 1;
   width: 100%;
   height: 100%;
+`
+
+const StyledTopbarChildrenContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 `
 
 const StyledBottomBar = styled.div`
@@ -922,8 +1151,7 @@ const StyledLayoutDimensions = styled.div`
   width: 100%;
   &.preview,
   .preview {
-    ${rightSidePageLayout}
-    margin: ${({ theme }) => theme.space.default}px auto 0;
+    width: 100%;
     height: auto;
   }
 `
@@ -944,9 +1172,15 @@ const StyledLoadingView = styled.div`
 const ToolbarRow = styled.div`
   display: flex;
   flex-wrap: nowrap;
-  align-items: end;
-  margin-bottom: ${({ theme }) => theme.space.xxsmall}px;
-  border-bottom: solid 1px ${({ theme }) => theme.divideBorderColor};
+  position: absolute;
+  bottom: ${({ theme }) => theme.space.large}px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  width: fit-content;
+  background-color: ${({ theme }) => theme.boldBackgroundColor};
+  border: solid 1px ${({ theme }) => theme.divideBorderColor};
+  border-radius: 5px;
 `
 
 const StyledEditorWrapper = styled.div`
@@ -980,6 +1214,18 @@ const StyledPreview = styled.div`
   &.layout-editor {
     display: none;
   }
+
+  & .inline-comment.active,
+  .inline-comment.hv-active {
+    background-color: rgba(112, 84, 0, 0.8);
+  }
+`
+
+const StyledSelectionMenu = styled.div`
+  display: flex;
+  padding: 8px;
+  max-height: 37px;
+  cursor: pointer;
 `
 
 const StyledEditor = styled.div`
@@ -997,7 +1243,6 @@ const StyledEditor = styled.div`
   .preview {
     ${rightSidePageLayout}
     margin: auto;
-    padding: 0 ${({ theme }) => theme.space.xlarge}px;
   }
   & .CodeMirrorWrapper {
     height: 100%;
@@ -1007,6 +1252,8 @@ const StyledEditor = styled.div`
     width: 100%;
     height: 100%;
     position: relative;
+    z-index: 0 !important;
+    line-height: 1.4em;
     .CodeMirror-hints {
       position: absolute;
       z-index: 10;
@@ -1079,6 +1326,7 @@ const StyledEditor = styled.div`
   .CodeMirror-scroll {
     position: relative;
     z-index: 0;
+    width: 100%;
   }
   .CodeMirror-code,
   .CodeMirror-gutters {

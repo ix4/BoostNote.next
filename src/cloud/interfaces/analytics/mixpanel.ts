@@ -1,9 +1,6 @@
 export enum MixpanelActionTrackTypes {
   AccountCreate = 'account.create',
   AccountDelete = 'account.delete',
-  BlockCreate = 'block.create',
-  BlockEdit = 'block.edit',
-  BlockDelete = 'block.delete',
   DocArchive = 'doc.archive',
   DocBookmarkCreate = 'doc.bookmark.create',
   DocBookmarkDelete = 'doc.bookmark.delete',
@@ -20,10 +17,6 @@ export enum MixpanelActionTrackTypes {
   DocUnarchive = 'doc.unarchive',
   DocShareCreate = 'doc.share.create',
   DocTagAdd = 'doc.tags.add',
-  GuestCreate = 'guest.create',
-  GuestDelete = 'guest.delete',
-  GuestInviteCreate = 'guest.invite.create',
-  GuestInviteDelete = 'guest.invite.delete',
   ExportHtml = 'doc.export.html',
   ExportMd = 'doc.export.md',
   ExportPdf = 'doc.export.pdf',
@@ -70,12 +63,21 @@ export enum MixpanelActionTrackTypes {
   UpgradePassword = 'upgrade.origin.password',
   UpgradeExpirationDate = 'upgrade.origin.expiration.date',
   UpgradeRevision = 'upgrade.origin.revision',
-  UpgradeGuest = 'upgrade.origin.guest',
   UpgradeLimit = 'upgrade.origin.limit',
+  UpgradeDiscount = 'upgrade.origin.discount',
   WorkspaceOpen = 'workspace.open',
   WorkspaceCreate = 'workspace.create',
   WorkspaceDelete = 'workspace.delete',
   ZapierLinkOpen = 'zapier.link.open',
+  DocCommentThreadCreate = 'doc.thread.add',
+  DocCommentThreadEdit = 'doc.thread.edit',
+  DocCommentThreadDelete = 'doc.thread.delete',
+  LineCommentThreadCreate = 'line.thread.create',
+  LineCommentThreadEdit = 'line.thread.edit',
+  LineCommentThreadDelete = 'line.thread.delete',
+  CommentCreate = 'comment.create',
+  CommentUpdate = 'comment.update',
+  CommentDelete = 'comment.delete',
 }
 
 export type MixpanelFrontEvent =
@@ -95,11 +97,11 @@ export type MixpanelFrontEvent =
   | MixpanelActionTrackTypes.ExportHtml
   | MixpanelActionTrackTypes.DocLayoutEdit
   | MixpanelActionTrackTypes.UpgradeExpirationDate
-  | MixpanelActionTrackTypes.UpgradeGuest
   | MixpanelActionTrackTypes.UpgradeLimit
   | MixpanelActionTrackTypes.UpgradePassword
   | MixpanelActionTrackTypes.UpgradeRevision
   | MixpanelActionTrackTypes.DocFeatureRevision
+  | MixpanelActionTrackTypes.UpgradeDiscount
 
 export type MixpanelUserEvent = MixpanelActionTrackTypes.AccountDelete
 
@@ -147,15 +149,23 @@ export type MixpanelFolderEvent =
   | MixpanelActionTrackTypes.FolderBookmarkCreate
   | MixpanelActionTrackTypes.FolderBookmarkDelete
 
-export type MixpanelBlockEvent =
-  | MixpanelActionTrackTypes.BlockCreate
-  | MixpanelActionTrackTypes.BlockEdit
-  | MixpanelActionTrackTypes.BlockDelete
-
 export type MixpanelOpenInviteEvent =
   | MixpanelActionTrackTypes.OpenInviteCreate
   | MixpanelActionTrackTypes.OpenInviteDelete
   | MixpanelActionTrackTypes.OpenInviteReset
+
+export type MixpanelCommentThreadEvent =
+  | MixpanelActionTrackTypes.DocCommentThreadCreate
+  | MixpanelActionTrackTypes.DocCommentThreadEdit
+  | MixpanelActionTrackTypes.DocCommentThreadDelete
+  | MixpanelActionTrackTypes.LineCommentThreadCreate
+  | MixpanelActionTrackTypes.LineCommentThreadEdit
+  | MixpanelActionTrackTypes.LineCommentThreadDelete
+
+export type MixpanelCommentEvent =
+  | MixpanelActionTrackTypes.CommentCreate
+  | MixpanelActionTrackTypes.CommentUpdate
+  | MixpanelActionTrackTypes.CommentDelete
 
 export type MixpanelUserProfile = {
   $first_name?: string

@@ -1,84 +1,67 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import styled from '../../lib/styled'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDb } from '../../lib/db'
 import { entries } from '../../lib/db/utils'
-import {
-  mdiAccountMultiplePlusOutline,
-  mdiClockOutline,
-  mdiCog,
-  mdiDownload,
-  mdiFileDocumentMultipleOutline,
-  mdiLogin,
-  mdiLogout,
-  mdiMagnify,
-  mdiPlus,
-  mdiMenu,
-} from '@mdi/js'
+import { mdiLogin, mdiLogout, mdiPlus, mdiMessageQuestion } from '@mdi/js'
 import { useRouter } from '../../lib/router'
 import { useActiveStorageId, useRouteParams } from '../../lib/routeParams'
 import { usePreferences } from '../../lib/preferences'
-import { openContextMenu } from '../../lib/electronOnly'
+import { openContextMenu, setBadgeCount } from '../../lib/electronOnly'
 import { osName } from '../../lib/platform'
 import { useGeneralStatus } from '../../lib/generalStatus'
 import { useBoostHub } from '../../lib/boosthub'
-import SidebarToolbar, {
-  SidebarToolbarRow,
-} from '../v2/organisms/Sidebar/molecules/SidebarToolbar'
 import SidebarSpaces, {
   SidebarSpace,
   SidebarSpaceContentRow,
-} from '../v2/organisms/Sidebar/molecules/SidebarSpaces'
+} from '../../shared/components/organisms/Sidebar/molecules/SidebarSpaces'
 import { useStorageRouter } from '../../lib/storageRouter'
 import { MenuItemConstructorOptions } from 'electron/main'
-import { DialogIconTypes, useDialog } from '../../lib/dialog'
 import { useTranslation } from 'react-i18next'
-import RoundedImage from '../v2/atoms/RoundedImage'
-import { values } from 'ramda'
 import {
-  boostHubOpenImportModalEventEmitter,
-  boostHubSidebarStateEvent,
-  boostHubSidebarStateEventEmitter,
-  boostHubToggleSettingsEventEmitter,
-  boostHubToggleSettingsMembersEventEmitter,
-  boostHubToggleSidebarSearchEventEmitter,
-  boostHubToggleSidebarTimelineEventEmitter,
-  boostHubToggleSidebarTreeEventEmitter,
+  boosthubNotificationCountsEventEmitter,
+  boostHubSidebarSpaceEventEmitter,
 } from '../../lib/events'
-import { useSearchModal } from '../../lib/searchModal'
-import { SidebarState } from '../../lib/v2/sidebar'
+import CloudIntroModal from './CloudIntroModal'
+import { useCloudIntroModal } from '../../lib/cloudIntroModal'
+import { DialogIconTypes, useDialog } from '../../shared/lib/stores/dialog'
+import BasicInputFormLocal from '../v2/organisms/BasicInputFormLocal'
+import { useModal } from '../../shared/lib/stores/modal'
+import { useToast } from '../../shared/lib/stores/toast'
+import styled from '../../shared/lib/styled'
+import SidebarPopOver from '../../shared/components/organisms/Sidebar/atoms/SidebarPopOver'
 
 const TopLevelNavigator = () => {
   const { storageMap, renameStorage, removeStorage } = useDb()
   const { push } = useRouter()
-  const { preferences, togglePreferencesModal, closed } = usePreferences()
+  const { preferences } = usePreferences()
   const { generalStatus } = useGeneralStatus()
   const routeParams = useRouteParams()
   const { signOut } = useBoostHub()
   const { navigate } = useStorageRouter()
-  const { prompt, messageBox } = useDialog()
+  const { messageBox } = useDialog()
+  const { openModal, closeLastModal } = useModal()
+  const { pushMessage } = useToast()
   const { t } = useTranslation()
-  const { toggleShowSearchModal, showSearchModal } = useSearchModal()
-  const [sidebarState, setSidebarState] = useState<SidebarState | undefined>(
-    'tree'
-  )
   const [showSpaces, setShowSpaces] = useState(false)
   const boostHubUserInfo = preferences['cloud.user']
   const activeStorageId = useActiveStorageId()
+  const { showingCloudIntroModal } = useCloudIntroModal()
+  const [notificationCounts, setNotificationCounts] = useState<
+    Record<string, number>
+  >({})
 
   useEffect(() => {
-    const boostHubSidebarStateEventHandler = (
-      event: boostHubSidebarStateEvent
-    ) => {
-      setSidebarState(event.detail.state)
+    const handler = (event: CustomEvent<Record<string, number>>) => {
+      setNotificationCounts(event.detail)
     }
-
-    boostHubSidebarStateEventEmitter.listen(boostHubSidebarStateEventHandler)
-    return () => {
-      boostHubSidebarStateEventEmitter.unlisten(
-        boostHubSidebarStateEventHandler
-      )
-    }
+    boosthubNotificationCountsEventEmitter.listen(handler)
+    return () => boosthubNotificationCountsEventEmitter.unlisten(handler)
   }, [])
+
+  useEffect(() => {
+    setBadgeCount(
+      Object.values(notificationCounts).reduce((prev, curr) => prev + curr, 0)
+    )
+  }, [notificationCounts])
 
   const activeBoostHubTeamDomain = useMemo<string | null>(() => {
     if (routeParams.name !== 'boosthub.teams.show') {
@@ -132,18 +115,32 @@ const TopLevelNavigator = () => {
     return rows
   }, [boostHubUserInfo, push, signOut])
 
+  useEffect(() => {
+    const boostHubSidebarSpaceEventHandler = () => {
+      setShowSpaces(true)
+    }
+
+    boostHubSidebarSpaceEventEmitter.listen(boostHubSidebarSpaceEventHandler)
+    return () => {
+      boostHubSidebarSpaceEventEmitter.unlisten(
+        boostHubSidebarSpaceEventHandler
+      )
+    }
+  }, [])
+
+  const inputRef = useRef<HTMLInputElement>(null)
   const spaces = useMemo(() => {
     const spaces: SidebarSpace[] = []
 
-    entries(storageMap).forEach(([storageId, storage], index) => {
+    entries(storageMap).forEach(([workspaceId, workspace], index) => {
       spaces.push({
-        label: storage.name,
-        active: activeStorageId === storageId,
+        label: workspace.name,
+        active: activeStorageId === workspaceId,
         tooltip: `${osName === 'macos' ? '⌘' : 'Ctrl'} ${index + 1}`,
         linkProps: {
           onClick: (event) => {
             event.preventDefault()
-            navigate(storage.id)
+            navigate(workspace.id)
           },
           onContextMenu: (event) => {
             event.preventDefault()
@@ -153,17 +150,32 @@ const TopLevelNavigator = () => {
                 type: 'normal',
                 label: t('storage.rename'),
                 click: async () => {
-                  prompt({
-                    title: `Rename "${storage.name}" storage`,
-                    message: t('storage.renameMessage'),
-                    iconType: DialogIconTypes.Question,
-                    defaultValue: storage.name,
-                    submitButtonLabel: t('storage.rename'),
-                    onClose: async (value: string | null) => {
-                      if (value == null) return
-                      await renameStorage(storage.id, value)
-                    },
-                  })
+                  openModal(
+                    <BasicInputFormLocal
+                      inputRef={inputRef}
+                      defaultIcon={mdiMessageQuestion}
+                      defaultInputValue={workspace.name}
+                      placeholder='Folder name'
+                      submitButtonProps={{
+                        label: t('storage.rename'),
+                      }}
+                      onSubmit={async (workspaceName: string | null) => {
+                        if (workspaceName == '' || workspaceName == null) {
+                          pushMessage({
+                            title: 'Cannot rename folder',
+                            description: 'Folder name should not be empty.',
+                          })
+                          return
+                        }
+                        await renameStorage(workspace.id, workspaceName)
+                        closeLastModal()
+                      }}
+                    />,
+                    {
+                      showCloseIcon: true,
+                      title: `Rename "${workspace.name}" storage`,
+                    }
+                  )
                 },
               },
               { type: 'separator' },
@@ -172,20 +184,22 @@ const TopLevelNavigator = () => {
                 label: t('storage.remove'),
                 click: async () => {
                   messageBox({
-                    title: `Remove "${storage.name}" storage`,
+                    title: `Remove "${workspace.name}" storage`,
                     message:
-                      storage.type === 'fs'
+                      workspace.type === 'fs'
                         ? "This operation won't delete the actual storage folder. You can add it to the app again."
                         : t('storage.removeMessage'),
                     iconType: DialogIconTypes.Warning,
-                    buttons: [t('storage.remove'), t('general.cancel')],
-                    defaultButtonIndex: 0,
-                    cancelButtonIndex: 1,
-                    onClose: (value: number | null) => {
-                      if (value === 0) {
-                        removeStorage(storage.id)
-                      }
-                    },
+                    buttons: [
+                      {
+                        label: t('storage.remove'),
+                        defaultButton: true,
+                        onClick: () => {
+                          removeStorage(workspace.id)
+                        },
+                      },
+                      { label: t('general.cancel'), cancelButton: true },
+                    ],
                   })
                 },
               },
@@ -216,163 +230,38 @@ const TopLevelNavigator = () => {
 
     return spaces
   }, [
-    activeStorageId,
     storageMap,
-    activeBoostHubTeamDomain,
     generalStatus.boostHubTeams,
-    messageBox,
-    prompt,
-    removeStorage,
-    renameStorage,
+    activeStorageId,
     navigate,
-    push,
     t,
-  ])
-
-  const toolbarRows = useMemo<SidebarToolbarRow[]>(() => {
-    const boosthubTeam =
-      activeBoostHubTeamDomain != null
-        ? generalStatus.boostHubTeams.find(
-            (team) => team.domain === activeBoostHubTeamDomain
-          )
-        : null
-
-    if (boosthubTeam != null) {
-      return [
-        {
-          tooltip: 'Spaces',
-          active: showSpaces,
-          icon: (
-            <RoundedImage
-              size={30}
-              alt={boosthubTeam.name}
-              url={boosthubTeam.iconUrl}
-            />
-          ),
-          onClick: () => setShowSpaces((prev) => !prev),
-        },
-
-        {
-          tooltip: 'Tree',
-          icon: mdiFileDocumentMultipleOutline,
-          active: sidebarState === 'tree' && !showSpaces,
-          onClick: boostHubToggleSidebarTreeEventEmitter.dispatch,
-        },
-        {
-          tooltip: 'Search',
-          active: sidebarState === 'search' && !showSpaces,
-          icon: mdiMagnify,
-          onClick: boostHubToggleSidebarSearchEventEmitter.dispatch,
-        },
-        {
-          tooltip: 'Timeline',
-          active: sidebarState === 'timeline' && !showSpaces,
-          icon: mdiClockOutline,
-          onClick: boostHubToggleSidebarTimelineEventEmitter.dispatch,
-        },
-        {
-          tooltip: 'Import',
-          icon: mdiDownload,
-          position: 'bottom',
-          onClick: boostHubOpenImportModalEventEmitter.dispatch,
-        },
-        {
-          tooltip: 'Members',
-          active: false,
-          icon: mdiAccountMultiplePlusOutline,
-          position: 'bottom',
-          onClick: boostHubToggleSettingsMembersEventEmitter.dispatch,
-        },
-        {
-          tooltip: 'Settings',
-          active: false,
-          icon: mdiCog,
-          position: 'bottom',
-          onClick: boostHubToggleSettingsEventEmitter.dispatch,
-        },
-      ] as SidebarToolbarRow[]
-    }
-
-    const activeStorage = values(storageMap).find(
-      (storage) => activeStorageId === storage?.id
-    )
-    if (activeStorage) {
-      return [
-        {
-          tooltip: 'Spaces',
-          active: showSpaces,
-          icon: <RoundedImage size={30} alt={activeStorage.name} />,
-          onClick: () => setShowSpaces((prev) => !prev),
-        },
-
-        {
-          tooltip: 'Tree',
-          icon: mdiFileDocumentMultipleOutline,
-          active: !showSearchModal && closed && !showSpaces,
-          onClick: undefined,
-        },
-        {
-          tooltip: 'Search',
-          active: showSearchModal && closed && !showSpaces,
-          icon: mdiMagnify,
-          onClick: toggleShowSearchModal,
-        },
-        {
-          tooltip: 'Settings',
-          active: !closed && !showSpaces,
-          position: 'bottom',
-          icon: mdiCog,
-          onClick: togglePreferencesModal,
-        },
-      ] as SidebarToolbarRow[]
-    }
-
-    return [
-      {
-        tooltip: 'Spaces',
-        active: showSpaces,
-        icon: mdiMenu,
-        onClick: () => setShowSpaces((prev) => !prev),
-      },
-    ] as SidebarToolbarRow[]
-  }, [
+    openModal,
+    renameStorage,
+    closeLastModal,
+    pushMessage,
+    messageBox,
+    removeStorage,
     activeBoostHubTeamDomain,
-    generalStatus.boostHubTeams,
-    showSpaces,
-    storageMap,
-    activeStorageId,
-    showSearchModal,
-    closed,
-    togglePreferencesModal,
-    toggleShowSearchModal,
-    sidebarState,
+    push,
   ])
 
   return (
     <Container>
-      <SidebarToolbar
-        rows={toolbarRows}
-        className='sidebar__toolbar'
-        iconSize={26}
-      />
       {showSpaces && (
-        <SidebarSpaces
-          className='sidebar__spaces'
-          spaces={spaces}
-          spaceBottomRows={spaceBottomRows}
-          onSpacesBlur={() => setShowSpaces(false)}
-        />
+        <SidebarPopOver onClose={() => setShowSpaces(false)}>
+          <SidebarSpaces
+            className='sidebar__spaces'
+            spaces={spaces}
+            spaceBottomRows={spaceBottomRows}
+            onSpacesBlur={() => setShowSpaces(false)}
+          />
+        </SidebarPopOver>
       )}
+      {showingCloudIntroModal && <CloudIntroModal />}
     </Container>
   )
 }
 
 export default TopLevelNavigator
 
-const Container = styled.div`
-  .sidebar__toolbar .sidebar__toolbar__top {
-    .sidebar__toolbar__item:first-of-type {
-      height: 32px;
-    }
-  }
-`
+const Container = styled.div``

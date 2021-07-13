@@ -4,31 +4,52 @@ import { useRouteParams, AllRouteParams } from '../lib/routeParams'
 import StorageCreatePage from './pages/StorageCreatePage'
 import { useDb } from '../lib/db'
 import AttachmentsPage from './pages/AttachmentsPage'
-import styled from '../lib/styled'
 import WikiNotePage from './pages/WikiNotePage'
 import { values } from '../lib/db/utils'
 import BoostHubTeamsShowPage from './pages/BoostHubTeamsShowPage'
 import BoostHubTeamsCreatePage from './pages/BoostHubTeamsCreatePage'
 import BoostHubAccountDeletePage from './pages/BoostHubAccountDeletePage'
 import {
+  boostHubAppRouterEventEmitter,
   BoostHubNavigateRequestEvent,
   boostHubNavigateRequestEventEmitter,
+  BoostHubAppRouterEvent,
 } from '../lib/events'
 import { parse as parseUrl } from 'url'
 import { openNew } from '../lib/platform'
 import BoostHubLoginPage from './pages/BoostHubLoginPage'
 import { ObjectMap, NoteStorage } from '../lib/db/types'
 import { useGeneralStatus } from '../lib/generalStatus'
-
-const NotFoundPageContainer = styled.div`
-  padding: 15px 25px;
-`
+import ArchivePage from './pages/ArchivePage'
+import LabelsPage from './pages/LabelsPage'
+import TimelinePage from './pages/TimelinePage'
+import PouchDbDeprecationPage from './pages/PouchDbDeprecationPage'
+import NotFoundErrorPage from './pages/NotFoundErrorPage'
 
 const Router = () => {
   const routeParams = useRouteParams()
   const { storageMap } = useDb()
-  const { push } = useRouter()
+  const { push, goBack, goForward } = useRouter()
   const { generalStatus } = useGeneralStatus()
+
+  useEffect(() => {
+    const boostHubAppRouterEventHandler = (event: BoostHubAppRouterEvent) => {
+      switch (event.detail.target) {
+        case 'forward':
+          goForward()
+          return
+        case 'back':
+        default:
+          goBack()
+          return
+      }
+    }
+
+    boostHubAppRouterEventEmitter.listen(boostHubAppRouterEventHandler)
+    return () => {
+      boostHubAppRouterEventEmitter.unlisten(boostHubAppRouterEventHandler)
+    }
+  }, [goBack, goForward])
 
   useEffect(() => {
     const boostHubNavigateRequestHandler = (
@@ -119,33 +140,83 @@ function useContent(
       return <BoostHubAccountDeletePage />
     case 'boosthub.teams.show':
       return null
-    case 'storages.notes':
-    case 'storages.trashCan':
-    case 'storages.tags.show': {
-      const { storageId } = routeParams
-      const storage = storageMap[storageId]
+    case 'workspaces.notes': {
+      const { workspaceId } = routeParams
+      const storage = storageMap[workspaceId]
       if (storage == null) {
         break
       }
 
-      return <WikiNotePage storage={storage} />
+      return storage.type == 'pouch' ? (
+        <PouchDbDeprecationPage />
+      ) : (
+        <WikiNotePage storage={storage} />
+      )
     }
-    case 'storages.attachments': {
-      const { storageId } = routeParams
-      const storage = storageMap[storageId]
+
+    case 'workspaces.labels.show': {
+      const { workspaceId, tagName } = routeParams
+      const storage = storageMap[workspaceId]
       if (storage == null) {
         break
       }
-      return <AttachmentsPage storage={storage} />
+
+      return storage.type == 'pouch' ? (
+        <PouchDbDeprecationPage />
+      ) : (
+        <LabelsPage storage={storage} tagName={tagName} />
+      )
     }
-    case 'storages.create':
+
+    case 'workspaces.archive': {
+      const { workspaceId } = routeParams
+      const storage = storageMap[workspaceId]
+      if (storage == null) {
+        break
+      }
+
+      return storage.type == 'pouch' ? (
+        <PouchDbDeprecationPage />
+      ) : (
+        <ArchivePage storage={storage} />
+      )
+    }
+    case 'workspaces.attachments': {
+      const { workspaceId } = routeParams
+      const storage = storageMap[workspaceId]
+      if (storage == null) {
+        break
+      }
+
+      return storage.type == 'pouch' ? (
+        <PouchDbDeprecationPage />
+      ) : (
+        <AttachmentsPage storage={storage} />
+      )
+    }
+    case 'workspaces.timeline': {
+      const { workspaceId } = routeParams
+      const storage = storageMap[workspaceId]
+      if (storage == null) {
+        break
+      }
+
+      return storage.type == 'pouch' ? (
+        <PouchDbDeprecationPage />
+      ) : (
+        <TimelinePage storage={storage} />
+      )
+    }
+    case 'workspaces.create':
       return <StorageCreatePage />
   }
   return (
-    <NotFoundPageContainer>
-      <h1>Page not found</h1>
-      <p>Check the URL or click other link in the left side navigation.</p>
-    </NotFoundPageContainer>
+    <NotFoundErrorPage
+      title={'Page not found'}
+      description={
+        'Check the URL or click other link in the left side navigation.'
+      }
+    />
   )
 }
 

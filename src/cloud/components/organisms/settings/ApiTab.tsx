@@ -1,29 +1,26 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { ChangeEvent, useCallback, useMemo, useState } from 'react'
 import styled from '../../../lib/styled'
-import {
-  Section,
-  TabHeader,
-  Column,
-  Container,
-  Scrollable,
-  SectionSubtleText,
-  SectionHeader2,
-  PrimaryAnchor,
-} from './styled'
-import CustomButton from '../../atoms/buttons/CustomButton'
 import Spinner from '../../atoms/CustomSpinner'
 import { useApiTokens, withApiTokens } from '../../../lib/stores/apiTokens'
 import TokenControl from '../../molecules/TokenControl'
-import TokenCreate from '../../molecules/TokenCreate'
 import { usePage } from '../../../lib/stores/pageStore'
-import Flexbox from '../../atoms/Flexbox'
 import Icon from '../../atoms/IconMdi'
 import { mdiOpenInNew } from '@mdi/js'
+import SettingTabContent from '../../../../shared/components/organisms/Settings/atoms/SettingTabContent'
+import Button from '../../../../shared/components/atoms/Button'
+import Flexbox from '../../../../shared/components/atoms/Flexbox'
+import { ExternalLink } from '../../../../shared/components/atoms/Link'
+import Form from '../../../../shared/components/molecules/Form'
+import ViewerRestrictedWrapper from '../../molecules/ViewerRestrictedWrapper'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
+import { TFunction } from 'i18next'
 
 const ApiTab = () => {
   const { team } = usePage()
   const apiTokenState = useApiTokens()
   const [tokenCreateMode, setTokenCreateMode] = useState(false)
+  const { translate } = useI18n()
 
   const createToken = useCallback(
     (name: string) => {
@@ -42,44 +39,40 @@ const ApiTab = () => {
   }, [apiTokenState, team])
 
   return (
-    <Column>
-      <Scrollable>
-        <Container>
-          <Section>
-            <TabHeader>API</TabHeader>
-            <SectionSubtleText>
-              These tokens are available only to{' '}
-              {team != null ? team.name : 'your team'}.
-            </SectionSubtleText>
-          </Section>
-          <Section>
+    <SettingTabContent
+      title='API'
+      description={translate(lngKeys.ManageApi, {
+        space: team != null ? team.name : translate(lngKeys.GeneralThisSpace),
+      })}
+      body={
+        <ViewerRestrictedWrapper>
+          <section>
             <Flexbox justifyContent='space-between' alignItems='start'>
               <div>
-                <SectionHeader2 style={{ margin: '0' }}>
-                  Access Tokens
-                </SectionHeader2>
+                <h2 style={{ margin: '0' }}>
+                  {translate(lngKeys.AccessTokens)}
+                </h2>
                 <p>
-                  See the{' '}
-                  <PrimaryAnchor
-                    href='https://intercom.help/boostnote-for-teams/en/articles/4590937-public-api-documentation'
-                    target='_blank'
-                  >
-                    documentation for Boost Note for Teams API{' '}
+                  {translate(lngKeys.GeneralSeeVerb)}:{' '}
+                  <ExternalLink href='https://intercom.help/boostnote-for-teams/en/articles/4590937-public-api-documentation'>
+                    {translate(lngKeys.TokensDocumentation)}{' '}
                     <Icon path={mdiOpenInNew} />
-                  </PrimaryAnchor>
+                  </ExternalLink>
                 </p>
               </div>
-              <CustomButton
+              <Button
                 onClick={() => setTokenCreateMode(!tokenCreateMode)}
                 disabled={apiTokenState.state === 'initialising'}
               >
-                {tokenCreateMode ? 'Close' : 'Generate Token'}
-              </CustomButton>
+                {tokenCreateMode
+                  ? translate(lngKeys.GeneralCloseVerb)
+                  : translate(lngKeys.GenerateToken)}
+              </Button>
             </Flexbox>
             {tokenCreateMode && (
               <StyledServiceList>
                 <StyledServiceListItem>
-                  <TokenCreate onCreate={createToken} />
+                  <SettingTokenCreate onCreate={createToken} t={translate} />
                 </StyledServiceListItem>
               </StyledServiceList>
             )}
@@ -103,10 +96,55 @@ const ApiTab = () => {
                 })}
               </StyledServiceList>
             )}
-          </Section>
-        </Container>
-      </Scrollable>
-    </Column>
+          </section>
+        </ViewerRestrictedWrapper>
+      }
+    ></SettingTabContent>
+  )
+}
+
+const SettingTokenCreate = ({
+  onCreate,
+  t,
+}: {
+  onCreate: (val: string) => void
+  t: TFunction
+}) => {
+  const [name, setName] = useState('')
+
+  const create = useCallback(() => {
+    onCreate(name)
+  }, [name, onCreate])
+
+  return (
+    <div className='setting__token__form'>
+      <h2>{t(lngKeys.CreateTokens)}</h2>
+      <Form
+        onSubmit={create}
+        submitButton={{
+          label: t(lngKeys.GeneralCreate),
+          disabled: name.length === 0,
+        }}
+        rows={[
+          {
+            title: t(lngKeys.GeneralName),
+            required: true,
+            items: [
+              {
+                type: 'input',
+                props: {
+                  placeholder: t(lngKeys.TokensName),
+                  value: name,
+                  onChange: (e: ChangeEvent<HTMLInputElement>) => {
+                    setName(e.target.value)
+                  },
+                },
+              },
+            ],
+          },
+        ]}
+      />
+    </div>
   )
 }
 
@@ -122,6 +160,10 @@ const StyledServiceListItem = styled.li`
   align-items: center;
   justify-content: space-between;
   padding: ${({ theme }) => theme.space.small}px;
+
+  .setting__token__form {
+    width: 100%;
+  }
 
   + li {
     border-top: 1px solid ${({ theme }) => theme.baseBorderColor};

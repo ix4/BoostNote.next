@@ -5,7 +5,6 @@ import {
 } from '../../../interfaces/db/doc'
 import { SerializedFolderWithBookmark } from '../../../interfaces/db/folder'
 import { SerializedWorkspace } from '../../../interfaces/db/workspace'
-import { SerializedOpenInvite } from '../../../interfaces/db/openInvite'
 import { SerializedUser } from '../../../interfaces/db/user'
 import { SerializedRevision } from '../../../interfaces/db/revision'
 import { callApi } from '../../../lib/client'
@@ -14,7 +13,6 @@ import querystring from 'querystring'
 
 export type TeamShowPageResponseBody = GeneralAppProps & {
   pageWorkspace: SerializedWorkspace
-  openInvite?: SerializedOpenInvite
 }
 
 export async function getTeamIndexPageData({
@@ -46,7 +44,8 @@ export type FolderPageResourceProps = {
 
 export type ResourceSplitProps = DocPageResourceProps | FolderPageResourceProps
 
-export type ResourceShowPageResponseBody = GeneralAppProps & ResourceSplitProps
+export type ResourceShowPageResponseBody = GeneralAppProps &
+  ResourceSplitProps & { thread?: string }
 
 export async function getResourceShowPageData({
   pathname,

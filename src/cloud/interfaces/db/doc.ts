@@ -4,9 +4,21 @@ import { SerializedRevision } from './revision'
 import type { SerializedTag } from './tag'
 import { SerializedWorkspace } from './workspace'
 import { SerializedShareLink } from './shareLink'
+import { SerializedUser } from './user'
+
+export type DocStatus = 'in_progress' | 'completed' | 'archived' | 'paused'
+
+export interface SerializedDocAssignee {
+  id: string
+  docId: string
+  doc?: SerializedDoc
+  userId: string
+  user?: SerializedUser
+}
 
 export interface SerializableDocProps {
   id: string
+  title: string
   emoji?: string
   parentFolderId?: string
   folderPathname: string
@@ -14,6 +26,10 @@ export interface SerializableDocProps {
   version: number
   teamId: string
   workspaceId: string
+  status?: DocStatus
+  dueDate: string
+  assignees?: SerializedDocAssignee[]
+  userId?: string
 }
 
 export interface SerializedUnserializableDocProps {
@@ -27,6 +43,7 @@ export interface SerializedUnserializableDocProps {
   workspace?: SerializedWorkspace
   shareLink?: SerializedShareLink
   collaborationToken?: string
+  user?: SerializedUser
 }
 
 export type SerializedDoc = SerializedUnserializableDocProps &

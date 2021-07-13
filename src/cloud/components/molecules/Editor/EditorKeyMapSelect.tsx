@@ -9,12 +9,15 @@ import { SelectChangeEventHandler } from '../../../lib/utils/events'
 import { selectStyle } from '../../../lib/styled/styleFunctions'
 import { trackEvent } from '../../../api/track'
 import { MixpanelActionTrackTypes } from '../../../interfaces/analytics/mixpanel'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
 
 const EditorKeyMapSelect = () => {
   const { setSettings, settings } = useSettings()
   const generalEditorKeyMap = settings['general.editorKeyMap']
   const [showingMenu, setShowingMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const { translate } = useI18n()
 
   const showMenu: React.MouseEventHandler<HTMLButtonElement> = useCallback(() => {
     setShowingMenu(true)
@@ -66,7 +69,7 @@ const EditorKeyMapSelect = () => {
         >
           <div className='menu__item'>
             <label className='menu__item__label' htmlFor='editorKeymapSelect'>
-              Editor Keymap
+              {translate(lngKeys.SettingsEditorKeyMap)}
             </label>
             <select
               onChange={selectIndentType}
@@ -90,7 +93,7 @@ const StyledContainer = styled.div`
   justify-content: center;
   align-items: center;
   .menu {
-    position: absolute
+    position: absolute;
     z-index: 2;
     border-radius: 5px;
     bottom: 30px;
@@ -102,7 +105,7 @@ const StyledContainer = styled.div`
   .menu__item__label {
     overflow: nowrap;
     display: block;
-    font-size: ${({ theme }) => theme.space.xxsmall}px;
+    font-size: ${({ theme }) => theme.fontSizes.small}px;
     margin-bottom: 0;
   }
   .menu__item__select {

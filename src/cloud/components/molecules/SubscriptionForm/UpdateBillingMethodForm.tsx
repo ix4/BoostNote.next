@@ -2,22 +2,24 @@ import React, { useState, useMemo, useCallback } from 'react'
 import {
   SectionIntroduction,
   SectionFlexRow,
-  SectionFlexDualButtons,
 } from '../../organisms/settings/styled'
-import CustomButton from '../../atoms/buttons/CustomButton'
 import { SerializedSubscription } from '../../../interfaces/db/subscription'
-import { Spinner } from '../../atoms/Spinner'
 import { updateSubMethod } from '../../../api/teams/subscription/update'
 import { useElements, useStripe, CardElement } from '@stripe/react-stripe-js'
-import {
-  StripeElementStyle,
-  StripeCardElementChangeEvent,
-} from '@stripe/stripe-js'
-import { selectTheme } from '../../../lib/styled'
+import { StripeCardElementChangeEvent } from '@stripe/stripe-js'
 import { useSettings } from '../../../lib/stores/settings'
-import { StyledCardElementContainer } from './index'
 import Alert from '../../../../components/atoms/Alert'
-import { useToast } from '../../../../lib/v2/stores/toast'
+import { useToast } from '../../../../shared/lib/stores/toast'
+import ButtonGroup from '../../../../shared/components/atoms/ButtonGroup'
+import Button, {
+  LoadingButton,
+} from '../../../../shared/components/atoms/Button'
+import FormStripeInput from '../../../../shared/components/molecules/Form/atoms/FormStripeInput'
+import FormRow from '../../../../shared/components/molecules/Form/templates/FormRow'
+import Form from '../../../../shared/components/molecules/Form'
+import styled from '../../../../shared/lib/styled'
+import { useI18n } from '../../../lib/hooks/useI18n'
+import { lngKeys } from '../../../lib/i18n/types'
 
 interface UpdateBillingMethodFormProps {
   sub?: SerializedSubscription
@@ -30,6 +32,7 @@ const UpdateBillingMethodForm = ({
   onSuccess,
   onCancel,
 }: UpdateBillingMethodFormProps) => {
+  const { translate } = useI18n()
   const stripe = useStripe()
   const elements = useElements()
   const { pushApiErrorMessage } = useToast()
@@ -68,20 +71,6 @@ const UpdateBillingMethodForm = ({
     }
   }
 
-  const stripeFormStyle: StripeElementStyle = useMemo(() => {
-    const theme = selectTheme(settings['general.theme'])
-    return {
-      base: {
-        color: theme.emphasizedTextColor,
-        fontFamily: theme.fontFamily,
-        fontSize: `${theme.fontSizes.default}px`,
-        '::placeholder': {
-          color: theme.subtleTextColor,
-        },
-      },
-    }
-  }, [settings])
-
   const currentCardBrand = sub?.cardBrand
 
   const [newCardBrand, setNewCardBrand] = useState('unknown')
@@ -114,68 +103,64 @@ const UpdateBillingMethodForm = ({
       <div>
         <SectionIntroduction>
           <p>You need to have a valid subscription to perform this action.</p>
-          <SectionFlexDualButtons>
-            <CustomButton
-              onClick={onCancel}
-              variant='secondary'
-              disabled={sending}
-            >
-              Cancel
-            </CustomButton>
-          </SectionFlexDualButtons>
+          <Button onClick={onCancel} variant='secondary' disabled={sending}>
+            Cancel
+          </Button>
         </SectionIntroduction>
       </div>
     )
   }
 
   return (
-    <div>
+    <Container>
       <SectionIntroduction>
-        <p>Update your Credit Card</p>
+        <p>{translate(lngKeys.BillingUpdateCard)}</p>
         <SectionFlexRow>
-          <label>Current Credit Card</label>
+          <label>{translate(lngKeys.BillingCurrentCard)}</label>
           <span className='value'>
             **** **** **** {sub.last4}
             {sub.cardBrand != null && ` (${sub.cardBrand})`}
           </span>
         </SectionFlexRow>
         {usingDifferentCurrencyPricing && (
-          <Alert variant='danger'>
-            Switching payment method from/to JCB card requires canceling
-            existing active subscription. Please cancel the existing one and
-            subscribe again with a new card.
-          </Alert>
+          <Alert variant='danger'>{translate(lngKeys.BillingChangeJCB)}</Alert>
         )}
 
-        <StyledCardElementContainer>
-          <CardElement
-            options={{
-              style: stripeFormStyle,
-            }}
-            onChange={handleCardElementChange}
-          />
-        </StyledCardElementContainer>
+        <Form rows={[]} onSubmit={onSubmit}>
+          <FormRow>
+            <FormStripeInput
+              className='form__row__item'
+              theme={settings['general.theme']}
+              onChange={handleCardElementChange}
+            />
+          </FormRow>
 
-        <SectionFlexDualButtons className='marginTop'>
-          <CustomButton
-            onClick={onCancel}
-            variant='secondary'
-            disabled={sending}
-          >
-            Cancel
-          </CustomButton>
+          <ButtonGroup display='flex' layout='spread' className='button__group'>
+            <Button onClick={onCancel} variant='secondary' disabled={sending}>
+              {translate(lngKeys.GeneralCancel)}
+            </Button>
 
-          <CustomButton
-            onClick={onSubmit}
-            variant='primary'
-            disabled={usingDifferentCurrencyPricing || sending}
-          >
-            {sending ? <Spinner /> : 'Update'}
-          </CustomButton>
-        </SectionFlexDualButtons>
+            <LoadingButton
+              type='submit'
+              variant='primary'
+              disabled={usingDifferentCurrencyPricing || sending}
+              spinning={sending}
+            >
+              {translate(lngKeys.GeneralUpdateVerb)}
+            </LoadingButton>
+          </ButtonGroup>
+        </Form>
       </SectionIntroduction>
-    </div>
+    </Container>
   )
 }
+
+const Container = styled.div`
+  width: 100%;
+
+  .button__group {
+    margin-top: ${({ theme }) => theme.sizes.spaces.md}px;
+  }
+`
 
 export default UpdateBillingMethodForm

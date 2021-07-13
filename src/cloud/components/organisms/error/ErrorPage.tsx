@@ -9,6 +9,7 @@ import { ThemeProvider } from 'styled-components'
 import ButtonLink from '../../atoms/ButtonLink'
 import SignInForm from '../../molecules/SignInForm'
 import { nodeEnv } from '../../../lib/consts'
+import { usingElectron } from '../../../lib/stores/electron'
 
 interface ErrorPageProps {
   error: Error
@@ -50,7 +51,7 @@ const ErrorPage = ({ error }: ErrorPageProps) => {
             stack={nodeEnv === 'production' ? undefined : error.stack}
           />
 
-          {statusCode == null ? (
+          {usingElectron || statusCode == null ? (
             <ButtonLink
               onClick={() => {
                 location.reload()
@@ -76,7 +77,9 @@ const ErrorPage = ({ error }: ErrorPageProps) => {
                 width: 200,
               }}
             >
-              {currentUser == null ? 'Go to homepage' : 'Go to workspace'}
+              {currentUser == null
+                ? 'Go to homepage'
+                : 'Go back to your default space'}
             </ButtonLink>
           )}
           {currentUser == null && statusCode === 401 && (

@@ -1,16 +1,22 @@
 import React, { useState, useCallback } from 'react'
-import {
-  FormGroup,
-  FormLabel,
-  FormPrimaryButton,
-  FormTextInput,
-} from '../atoms/form'
 import { useTranslation } from 'react-i18next'
 import { useRouter } from '../../lib/router'
 import { useDb } from '../../lib/db'
-import { useToast } from '../../lib/toast'
 import { useAnalytics, analyticsEvents } from '../../lib/analytics'
-import FormFolderSelector from '../atoms/FormFolderSelector'
+import { FormFolderSelectorInput } from '../atoms/form'
+import { useToast } from '../../shared/lib/stores/toast'
+import Form from '../../shared/components/molecules/Form'
+import { openDialog } from '../../lib/exports'
+import { getWorkspaceHref } from '../../lib/db/utils'
+import styled from '../../shared/lib/styled'
+import Button from '../../shared/components/atoms/Button'
+import ButtonGroup from '../../shared/components/atoms/ButtonGroup'
+
+const FormFolderSelectButtonContainer = styled.div`
+  .form__folder__select__button--width {
+    width: 100%;
+  }
+`
 
 const FSStorageCreateForm = () => {
   const [name, setName] = useState('')
@@ -20,45 +26,89 @@ const FSStorageCreateForm = () => {
   const { createStorage } = useDb()
   const { pushMessage } = useToast()
   const { report } = useAnalytics()
+
   const createStorageCallback = useCallback(async () => {
     try {
-      const storage = await createStorage(name, { type: 'fs', location })
+      const workspace = await createStorage(name, { type: 'fs', location })
       report(analyticsEvents.createStorage)
-      push(`/app/storages/${storage.id}/notes`)
+      push(getWorkspaceHref(workspace))
     } catch (error) {
       pushMessage({
         title: 'Something went wrong',
         description: error.toString(),
       })
     }
-  }, [createStorage, location, name, push, report, pushMessage])
+  }, [createStorage, name, location, report, push, pushMessage])
+
+  const openDialogAndStoreLocation = useCallback(async () => {
+    const location = await openDialog()
+    setLocation(location)
+  }, [setLocation])
 
   return (
-    <>
-      <FormGroup>
-        <FormLabel>{t('storage.name')}</FormLabel>
-        <FormTextInput
-          type='text'
-          value={name}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            setName(e.target.value)
-          }
-        />
-      </FormGroup>
-      <FormGroup>
-        <FormLabel>Location</FormLabel>
-
-        <FormFolderSelector value={location} setValue={setLocation} />
-      </FormGroup>
-      <FormGroup>
-        <FormPrimaryButton
-          onClick={createStorageCallback}
-          disabled={name.trim().length === 0 || location.trim().length === 0}
-        >
-          {t('storage.create')}
-        </FormPrimaryButton>
-      </FormGroup>
-    </>
+    <Form
+      rows={[
+        {
+          title: t('storage.name'),
+          items: [
+            {
+              type: 'input',
+              props: {
+                className: 'workspace__create__form__space__name',
+                type: 'text',
+                value: name,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                  setName(e.target.value),
+              },
+            },
+          ],
+        },
+        {
+          title: 'Location',
+          items: [
+            {
+              type: 'node',
+              element: (
+                <ButtonGroup>
+                  <FormFolderSelectorInput
+                    type='text'
+                    onClick={openDialogAndStoreLocation}
+                    readOnly
+                    value={
+                      location.trim().length === 0
+                        ? t('folder.noLocationSelected')
+                        : location
+                    }
+                  />
+                  <FormFolderSelectButtonContainer>
+                    <Button
+                      className={'form__folder__select__button--width'}
+                      variant={'primary'}
+                      onClick={openDialogAndStoreLocation}
+                    >
+                      Select
+                    </Button>
+                  </FormFolderSelectButtonContainer>
+                </ButtonGroup>
+              ),
+            },
+          ],
+        },
+        {
+          items: [
+            {
+              type: 'button',
+              props: {
+                label: t('storage.create'),
+                disabled:
+                  name.trim().length === 0 || location.trim().length === 0,
+                onClick: createStorageCallback,
+              },
+            },
+          ],
+        },
+      ]}
+    />
   )
 }
 

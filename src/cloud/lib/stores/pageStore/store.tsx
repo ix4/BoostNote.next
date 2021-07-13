@@ -16,8 +16,6 @@ import { SerializedSubscription } from '../../../interfaces/db/subscription'
 import { freePlanDocLimit } from '../../subscription'
 import { SubscriptionInfo } from './types'
 import { getFormattedDateFromUnixTimestamp } from '../../date'
-import { SerializedGuest } from '../../../interfaces/db/guest'
-import { getMapFromEntityArray } from '../../utils/array'
 import { useGlobalData } from '../globalData'
 
 interface PageStoreProps {
@@ -30,15 +28,9 @@ function usePageDataStore(pageProps: any) {
     globalData: { currentUser },
   } = useGlobalData()
   const pageDataRef = useCommittedRef(pageData)
-  const [guestsMap, setGuestsMap] = useState<Map<string, SerializedGuest>>(
-    new Map()
-  )
 
   useEffect(() => {
     setPageData(pageProps)
-    setGuestsMap(
-      getMapFromEntityArray((pageProps.guests as SerializedGuest[]) || [])
-    )
   }, [pageProps])
 
   const [setPartialPageData, setPartialPageDataRef] = useRefCallback(
@@ -52,14 +44,6 @@ function usePageDataStore(pageProps: any) {
       })
     },
     [setPageData]
-  )
-
-  const updateGuestsMap = useCallback(
-    (...mappedGuests: [string, SerializedGuest][]) =>
-      setGuestsMap((prevMap) => {
-        return new Map([...prevMap, ...mappedGuests])
-      }),
-    []
   )
 
   const team: undefined | SerializedTeam = pageData.team
@@ -78,6 +62,12 @@ function usePageDataStore(pageProps: any) {
 
     return permissions.find((p) => p.userId === currentUser.id)
   }, [currentUser, permissions])
+
+  const currentUserIsCoreMember = useMemo(() => {
+    return (
+      currentUserPermissions != null && currentUserPermissions.role !== 'viewer'
+    )
+  }, [currentUserPermissions])
 
   const updateTeamSubscription = useCallback(
     (sub?: Partial<SerializedSubscription>) => {
@@ -177,7 +167,6 @@ function usePageDataStore(pageProps: any) {
   )
 
   const currentSubInfo: SubscriptionInfo | undefined = useMemo(() => {
-    let label = ''
     let progressLabel = ''
     let rate = 0
     let overLimit = false
@@ -207,12 +196,11 @@ function usePageDataStore(pageProps: any) {
     overLimit = docCount >= freePlanDocLimit
     rate = docCount === 0 ? 0 : Math.ceil((docCount / freePlanDocLimit) * 100)
     progressLabel = `${docCount}/${freePlanDocLimit}`
-    label = `Under the free plan, you can create up to ${freePlanDocLimit} docs.`
 
     return {
       trialing: false,
       info: {
-        label,
+        docLimit: freePlanDocLimit,
         trialIsOver,
         progressLabel,
         rate,
@@ -245,10 +233,8 @@ function usePageDataStore(pageProps: any) {
     setPageData,
     setPartialPageData,
     setPartialPageDataRef,
-    guestsMap,
-    setGuestsMap,
-    updateGuestsMap,
     currentUserPermissions,
+    currentUserIsCoreMember,
   }
 }
 

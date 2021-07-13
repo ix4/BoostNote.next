@@ -8,7 +8,6 @@ import { SerializedRevision } from '../../../interfaces/db/revision'
 import { SerializedTag } from '../../../interfaces/db/tag'
 import { SerializedWorkspace } from '../../../interfaces/db/workspace'
 import { SerializedOpenInvite } from '../../../interfaces/db/openInvite'
-import { SerializedGuest } from '../../../interfaces/db/guest'
 
 export interface PageDataContext<D> {
   pageData: D
@@ -35,12 +34,8 @@ export interface PageDataContext<D> {
   setPageData: (data: D) => void
   setPartialPageData: (data: D) => void
   setPartialPageDataRef: React.MutableRefObject<(data: D) => void>
-  guestsMap: Map<string, SerializedGuest>
   currentUserPermissions?: SerializedUserTeamPermissions
-  updateGuestsMap: (...mappedGuests: [string, SerializedGuest][]) => void
-  setGuestsMap: (
-    value: React.SetStateAction<Map<string, SerializedGuest>>
-  ) => void
+  currentUserIsCoreMember: boolean
 }
 
 export interface PageDataProps {
@@ -56,7 +51,7 @@ type SubscriptionTrialInfo = {
 type SubscriptionInactiveInfo = {
   trialing: false
   info: {
-    label: string
+    docLimit: number
     progressLabel: string
     rate: number
     overLimit: boolean

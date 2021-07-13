@@ -1,11 +1,11 @@
 import React, { useCallback } from 'react'
 import Image from '../atoms/Image'
-import Icon from '../atoms/Icon'
 import { mdiAccountPlus, mdiHistory, mdiChartBar } from '@mdi/js'
-import styled from '../../lib/styled'
-import { flexCenter, border } from '../../lib/styled/styleFunctions'
 import { openNew } from '../../lib/platform'
 import { boostHubLearnMorePageUrl } from '../../lib/boosthub'
+import Icon from '../../shared/components/atoms/Icon'
+import styled from '../../shared/lib/styled'
+import { border, flexCenter } from '../../shared/lib/styled/styleFunctions'
 
 const BoostHubFeatureIntro = () => {
   const openLearnMorePage = useCallback(() => {
@@ -55,7 +55,7 @@ const BoostHubFeatureIntro = () => {
         </li>
       </ul>
       <div className='screenShot'>
-        <Image src='/app/static/boosthub.png' />
+        <Image src='/app/static/img_ui_no-annotation.jpg' />
       </div>
     </Container>
   )
@@ -73,7 +73,7 @@ const Container = styled.div`
     padding: 0;
     & > .featureLearnMoreItem {
       text-align: right;
-      color: ${({ theme }) => theme.primaryColor};
+      color: ${({ theme }) => theme.colors.text.primary};
       cursor: pointer;
       &:hover {
         text-decoration: underline;
@@ -81,15 +81,15 @@ const Container = styled.div`
     }
   }
   .featureList > .featureListItem {
-    ${border}
+    ${border};
     display: flex;
     padding: 0 5px;
     margin-bottom: 20px;
     border-radius: 5px;
     padding: 10px 5px 10px 10px;
-    background-color: ${({ theme }) => theme.navItemBackgroundColor};
+    background-color: ${({ theme }) => theme.colors.background.secondary};
     & > .featureListItemIcon {
-      ${flexCenter}
+      ${flexCenter};
       font-size: 24px;
       width: 24px;
       height: 24px;
@@ -111,7 +111,7 @@ const Container = styled.div`
     flex: 1;
     img {
       width: 100%;
-      ${border}
+      ${border};
       border-radius: 5px;
     }
   }

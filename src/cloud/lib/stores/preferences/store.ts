@@ -4,38 +4,72 @@ import { localLiteStorage } from 'ltstrg'
 import { Preferences } from './types'
 import { preferencesKey } from '../../localStorageKeys'
 import { useSetState } from 'react-use'
+import {
+  cloudSidebaCategoryLabels,
+  cloudSidebarOrderedCategoriesDelimiter,
+} from '../../sidebar'
 
 function savePreferencesToLocalStorage(preferences: Partial<Preferences>) {
   localLiteStorage.setItem(preferencesKey, JSON.stringify(preferences))
 }
 
 const basePreferences: Preferences = {
-  docContextIsHidden: false,
+  folderSortingOrder: 'Latest Updated',
+  docContextMode: 'context',
   sidebarIsHidden: false,
   sidebarIsHovered: false,
+  sidebarTreeSortingOrder: 'drag',
   sideBarWidth: 250,
-  lastUsedLayout: 'split',
-  sidebarBookmarksAreUnfolded: false,
+  lastEditorMode: 'edit',
+  lastEditorEditLayout: 'split',
   workspaceManagerIsOpen: true,
   lastSidebarState: 'tree',
+  sidebarOrderedCategories: cloudSidebaCategoryLabels.join(
+    cloudSidebarOrderedCategoriesDelimiter
+  ),
+  version: 1,
+}
+
+function getExistingPreferences() {
+  try {
+    const stringifiedPreferences = localLiteStorage.getItem(preferencesKey)
+    if (stringifiedPreferences == null) return
+    const existingPreferences = JSON.parse(stringifiedPreferences)
+    if (existingPreferences.version == null) {
+      existingPreferences.version = 1
+
+      const categories = existingPreferences.sidebarOrderedCategories.split(
+        cloudSidebarOrderedCategoriesDelimiter
+      ) as string[]
+      if (categories[0] === 'Bookmarks') {
+        categories.splice(1, 0, 'Smart Folders')
+      } else {
+        categories.splice(0, 0, 'Smart Folders')
+      }
+      console.info('Upgrade preferences from null to v1')
+
+      existingPreferences.sidebarOrderedCategories = [...new Set(categories)]
+        .filter((label) => label.length > 0)
+        .join(cloudSidebarOrderedCategoriesDelimiter)
+    }
+
+    return existingPreferences
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn(error.message)
+  }
+}
+
+const initialPreference = {
+  ...basePreferences,
+  ...getExistingPreferences(),
 }
 
 function usePreferencesStore() {
   const [preferences, setPreferences] = useSetState<Partial<Preferences>>(
-    basePreferences
+    initialPreference
   )
   const hoverOffTimeoutRef = useRef<number>()
-
-  useEffect(() => {
-    try {
-      const stringifiedPreferences = localLiteStorage.getItem(preferencesKey)
-      if (stringifiedPreferences == null) return
-      setPreferences(JSON.parse(stringifiedPreferences))
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn(error.message)
-    }
-  }, [setPreferences])
 
   useEffect(() => {
     savePreferencesToLocalStorage(preferences)

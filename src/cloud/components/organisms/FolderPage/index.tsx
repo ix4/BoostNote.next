@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useCallback, useState } from 'react'
+import React, { useMemo, useEffect, useState } from 'react'
 import { usePage } from '../../../lib/stores/pageStore'
 import { useNav } from '../../../lib/stores/nav'
 import { useTitle } from 'react-use'
@@ -13,37 +13,33 @@ import {
 } from '../../../lib/shortcuts'
 import { SerializedDocWithBookmark } from '../../../interfaces/db/doc'
 import {
-  mdiFolderOutline,
-  mdiTextBoxPlusOutline,
-  mdiFolderMultiplePlusOutline,
+  // mdiFolderOutline,
+  // mdiTextBoxPlus,
+  // mdiFolderMultiplePlusOutline,
   mdiStarOutline,
   mdiStar,
   mdiDotsHorizontal,
 } from '@mdi/js'
 import { SerializedFolderWithBookmark } from '../../../interfaces/db/folder'
-import EmojiIcon from '../../atoms/EmojiIcon'
+// import EmojiIcon from '../../atoms/EmojiIcon'
 import ContentManager from '../../molecules/ContentManager'
-import { useEmojiPicker } from '../../../lib/stores/emoji'
-import { EmojiResource } from '../Sidebar/SideNavigator/SideNavIcon'
-import RightLayoutHeaderButtons from '../../molecules/RightLayoutHeaderButtons'
+// import { useEmojiPicker } from '../../../lib/stores/emoji'
+// import { EmojiResource } from '../Sidebar/SideNavigator/SideNavIcon'
+// import RightLayoutHeaderButtons from '../../molecules/RightLayoutHeaderButtons'
 import { SerializedWorkspace } from '../../../interfaces/db/workspace'
 import Application from '../../Application'
-import ErrorLayout from '../../../../components/v2/templates/ErrorLayout'
-import { useCloudUpdater } from '../../../../lib/v2/hooks/cloud/useCloudUpdater'
-import { mapTopbarBreadcrumbs } from '../../../../lib/v2/mappers/cloud/topbarBreadcrumbs'
+import ErrorLayout from '../../../../shared/components/templates/ErrorLayout'
 import { useRouter } from '../../../lib/router'
-import { LoadingButton } from '../../../../components/v2/atoms/Button'
+import { LoadingButton } from '../../../../shared/components/atoms/Button'
 import FolderContextMenu from '../Topbar/Controls/ControlsContextMenu/FolderContextMenu'
-import FlattenedBreadcrumbs from '../../../../components/v2/molecules/FlattenedBreadcrumbs'
-import { useCloudUI } from '../../../../lib/v2/hooks/cloud/useCloudUI'
-
-enum FolderHeaderActions {
-  newDoc = 0,
-  newFolder = 1,
-}
+// import FlattenedBreadcrumbs from '../../../../shared/components/molecules/FlattenedBreadcrumbs'
+import { useCloudResourceModals } from '../../../lib/hooks/useCloudResourceModals'
+import { useCloudApi } from '../../../lib/hooks/useCloudApi'
+import { mapTopbarBreadcrumbs } from '../../../lib/mappers/topbarBreadcrumbs'
+import { useI18n } from '../../../lib/hooks/useI18n'
 
 const FolderPage = () => {
-  const { pageFolder, team } = usePage()
+  const { pageFolder, team, currentUserIsCoreMember } = usePage()
   const {
     docsMap,
     foldersMap,
@@ -51,9 +47,9 @@ const FolderPage = () => {
     workspacesMap,
     currentWorkspaceId,
   } = useNav()
-  const { openEmojiPicker } = useEmojiPicker()
-  const [sending, setSending] = useState<number>()
-  const { toggleFolderBookmark, sendingMap, deleteFolder } = useCloudUpdater()
+  // const { openEmojiPicker } = useEmojiPicker()
+  // const [sending, setSending] = useState<number>()
+  const { toggleFolderBookmark, sendingMap } = useCloudApi()
   const { push } = useRouter()
   const [showContextMenu, setShowContextMenu] = useState<boolean>(false)
   const {
@@ -61,7 +57,12 @@ const FolderPage = () => {
     openRenameFolderForm,
     openNewFolderForm,
     openNewDocForm,
-  } = useCloudUI()
+    deleteFolder,
+    openWorkspaceEditForm,
+    deleteDoc,
+    deleteWorkspace,
+  } = useCloudResourceModals()
+  const { translate } = useI18n()
 
   const currentFolder = useMemo(() => {
     if (pageFolder == null) {
@@ -75,7 +76,22 @@ const FolderPage = () => {
     if (team == null) {
       return []
     }
+
+    if (!currentUserIsCoreMember) {
+      return mapTopbarBreadcrumbs(
+        translate,
+        team,
+        foldersMap,
+        workspacesMap,
+        push,
+        {
+          pageFolder: currentFolder,
+        }
+      )
+    }
+
     return mapTopbarBreadcrumbs(
+      translate,
       team,
       foldersMap,
       workspacesMap,
@@ -84,9 +100,16 @@ const FolderPage = () => {
         pageFolder: currentFolder,
       },
       openRenameFolderForm,
-      openRenameDocForm
+      openRenameDocForm,
+      openNewDocForm,
+      openNewFolderForm,
+      openWorkspaceEditForm,
+      deleteDoc,
+      deleteFolder,
+      deleteWorkspace
     )
   }, [
+    translate,
     currentFolder,
     foldersMap,
     workspacesMap,
@@ -94,6 +117,13 @@ const FolderPage = () => {
     team,
     openRenameFolderForm,
     openRenameDocForm,
+    openNewFolderForm,
+    openNewDocForm,
+    deleteDoc,
+    deleteWorkspace,
+    deleteFolder,
+    openWorkspaceEditForm,
+    currentUserIsCoreMember,
   ])
 
   const childDocs = useMemo(() => {
@@ -126,16 +156,6 @@ const FolderPage = () => {
 
   useTitle(pageTitle)
 
-  const onEmojiClick = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      openEmojiPicker(event, {
-        item: currentFolder,
-        type: 'folder',
-      } as EmojiResource)
-    },
-    [currentFolder, openEmojiPicker]
-  )
-
   useEffect(() => {
     if (currentFolder == null) {
       setCurrentPath('/')
@@ -150,15 +170,19 @@ const FolderPage = () => {
         return
       }
 
-      if (isFolderEditShortcut(event)) {
-        preventKeyboardEventPropagation(event)
-        openRenameFolderForm(pageFolder)
-        return
-      }
-
       if (isFolderBookmarkShortcut(event)) {
         preventKeyboardEventPropagation(event)
         toggleFolderBookmark(team.id, pageFolder.id, pageFolder.bookmarked)
+        return
+      }
+
+      if (!currentUserIsCoreMember) {
+        return
+      }
+
+      if (isFolderEditShortcut(event)) {
+        preventKeyboardEventPropagation(event)
+        openRenameFolderForm(pageFolder)
         return
       }
       if (isFolderDeleteShortcut(event)) {
@@ -173,6 +197,7 @@ const FolderPage = () => {
     pageFolder,
     deleteFolder,
     toggleFolderBookmark,
+    currentUserIsCoreMember,
   ])
   useGlobalKeyDownHandler(folderPageControlsKeyDownHandler)
 
@@ -191,44 +216,6 @@ const FolderPage = () => {
 
     return map
   }, [currentWorkspace])
-
-  const openCreateDocForm = useCallback(() => {
-    openNewDocForm(
-      {
-        team,
-        workspaceId: currentFolder?.workspaceId,
-        parentFolderId: currentFolder?.id,
-      },
-      {
-        before: () => setSending(FolderHeaderActions.newDoc),
-        after: () => setSending(undefined),
-      },
-      [
-        {
-          description: <FlattenedBreadcrumbs breadcrumbs={topBarBreadcrumbs} />,
-        },
-      ]
-    )
-  }, [openNewDocForm, currentFolder, team, topBarBreadcrumbs])
-
-  const openCreateFolderForm = useCallback(() => {
-    openNewFolderForm(
-      {
-        team,
-        workspaceId: currentFolder?.workspaceId,
-        parentFolderId: currentFolder?.id,
-      },
-      {
-        before: () => setSending(FolderHeaderActions.newFolder),
-        after: () => setSending(undefined),
-      },
-      [
-        {
-          description: <FlattenedBreadcrumbs breadcrumbs={topBarBreadcrumbs} />,
-        },
-      ]
-    )
-  }, [openNewFolderForm, currentFolder, team, topBarBreadcrumbs])
 
   if (team == null) {
     return (
@@ -257,7 +244,6 @@ const FolderPage = () => {
   return (
     <Application
       content={{
-        reduced: true,
         topbar: {
           breadcrumbs: topBarBreadcrumbs,
           children: (
@@ -278,58 +264,20 @@ const FolderPage = () => {
           ),
           controls: [
             {
+              type: 'button',
               variant: 'icon',
               iconPath: mdiDotsHorizontal,
               onClick: () => setShowContextMenu(true),
             },
           ],
         },
-        header: (
-          <>
-            <EmojiIcon
-              defaultIcon={mdiFolderOutline}
-              emoji={currentFolder.emoji}
-              onClick={onEmojiClick}
-              style={{ marginRight: 10 }}
-              tooltip='Icon'
-              size={20}
-            />
-            <span
-              style={{
-                marginRight: 10,
-                whiteSpace: 'nowrap',
-                textOverflow: 'ellipsis',
-                overflowX: 'hidden',
-              }}
-            >
-              {currentFolder.name}
-            </span>
-            <RightLayoutHeaderButtons
-              buttons={[
-                {
-                  disabled: sending != null,
-                  sending: sending === FolderHeaderActions.newDoc,
-                  tooltip: 'Create new doc',
-                  iconPath: mdiTextBoxPlusOutline,
-                  onClick: openCreateDocForm,
-                },
-                {
-                  disabled: sending != null,
-                  sending: sending === FolderHeaderActions.newFolder,
-                  tooltip: 'Create new folder',
-                  iconPath: mdiFolderMultiplePlusOutline,
-                  onClick: openCreateFolderForm,
-                },
-              ]}
-            />
-          </>
-        ),
       }}
     >
       {showContextMenu && (
         <FolderContextMenu
           currentFolder={currentFolder}
           closeContextMenu={() => setShowContextMenu(false)}
+          currentUserIsCoreMember={currentUserIsCoreMember}
         />
       )}
       <ContentManager
@@ -337,6 +285,9 @@ const FolderPage = () => {
         documents={childDocs}
         folders={childFolders}
         workspacesMap={workspaceMap}
+        currentFolderId={currentFolder.id}
+        currentWorkspaceId={currentFolder.workspaceId}
+        currentUserIsCoreMember={currentUserIsCoreMember}
       />
     </Application>
   )

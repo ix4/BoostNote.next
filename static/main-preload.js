@@ -16,6 +16,18 @@
     console.log('opening ...', url)
     electron.shell.openExternal(url)
   }
+
+  function openPath(fullPath, folderOnly = true) {
+    if (folderOnly) {
+      console.log('opening path in folder...', fullPath)
+      electron.shell.showItemInFolder(fullPath)
+    } else {
+      electron.shell.openPath(fullPath).finally(() => {
+        console.log('Opening...', fullPath)
+      })
+    }
+  }
+
   function readFile(pathname) {
     return new Promise((resolve, reject) => {
       fs.readFile(pathname, (error, result) => {
@@ -144,6 +156,11 @@
     ipcRenderer.on(channel, listener)
   }
 
+  function sendIpcMessage(channel, data) {
+    const { ipcRenderer } = electron
+    ipcRenderer.send(channel, data)
+  }
+
   function removeIpcListener(channel, listener) {
     const { ipcRenderer } = electron
     ipcRenderer.removeListener(channel, listener)
@@ -215,8 +232,14 @@
     return electron.remote.session.defaultSession.cookies.remove(url, name)
   }
 
+  function setBadgeCount(count) {
+    const { app } = electron.remote
+    return app.setBadgeCount(count)
+  }
+
   window.__ELECTRON_ONLY__ = {}
   window.__ELECTRON_ONLY__.openExternal = openExternal
+  window.__ELECTRON_ONLY__.openPath = openPath
   window.__ELECTRON_ONLY__.readFile = readFile
   window.__ELECTRON_ONLY__.showOpenDialog = showOpenDialog
   window.__ELECTRON_ONLY__.showSaveDialog = showSaveDialog
@@ -234,16 +257,18 @@
   window.__ELECTRON_ONLY__.openContextMenu = openContextMenu
   window.__ELECTRON_ONLY__.getPathByName = getPathByName
   window.__ELECTRON_ONLY__.addIpcListener = addIpcListener
+  window.__ELECTRON_ONLY__.sendIpcMessage = sendIpcMessage
   window.__ELECTRON_ONLY__.removeIpcListener = removeIpcListener
   window.__ELECTRON_ONLY__.removeAllIpcListeners = removeAllIpcListeners
   window.__ELECTRON_ONLY__.setAsDefaultProtocolClient = setAsDefaultProtocolClient
   window.__ELECTRON_ONLY__.removeAsDefaultProtocolClient = removeAsDefaultProtocolClient
   window.__ELECTRON_ONLY__.isDefaultProtocolClient = isDefaultProtocolClient
-  window.__ELECTRON_ONLY__.getWebContentsById
+  window.__ELECTRON_ONLY__.getWebContentsById = getWebContentsById
   window.__ELECTRON_ONLY__.setTrafficLightPosition = setTrafficLightPosition
   window.__ELECTRON_ONLY__.convertHtmlStringToPdfBuffer = convertHtmlStringToPdfBuffer
   window.__ELECTRON_ONLY__.setCookie = setCookie
   window.__ELECTRON_ONLY__.getCookie = getCookie
   window.__ELECTRON_ONLY__.removeCookie = removeCookie
+  window.__ELECTRON_ONLY__.setBadgeCount = setBadgeCount
   window.__ELECTRON_ONLY__.got = got
 })()

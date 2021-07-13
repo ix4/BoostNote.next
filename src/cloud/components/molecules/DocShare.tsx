@@ -5,47 +5,34 @@ import { usePage } from '../../lib/stores/pageStore'
 import {
   createShareLink,
   deleteShareLink,
-  regenerateShareLink,
   updateShareLink,
 } from '../../api/share'
-import Switch from 'react-switch'
 import {
-  mdiChevronDown,
-  mdiChevronRight,
-  mdiLinkPlus,
-  mdiOpenInNew,
   mdiClipboardTextOutline,
-  mdiLinkVariant,
   mdiClipboardCheckOutline,
+  mdiEarth,
 } from '@mdi/js'
 import Icon from '../atoms/Icon'
 import copy from 'copy-to-clipboard'
-import styled from '../../lib/styled'
-import {
-  borderedInputStyle,
-  baseIconStyle,
-  secondaryButtonStyle,
-  inverseSecondaryButtonStyle,
-  inputStyle,
-  primaryButtonStyle,
-} from '../../lib/styled/styleFunctions'
 import Flexbox from '../atoms/Flexbox'
-import { Spinner } from '../atoms/Spinner'
-import DatePicker from 'react-datepicker'
 import { isArray } from 'util'
 import 'react-datepicker/dist/react-datepicker.css'
-import IconMdi from '../atoms/IconMdi'
 import { boostHubBaseUrl } from '../../lib/consts'
 import { SerializedTeam } from '../../interfaces/db/team'
-import { getDocLinkHref } from '../atoms/Link/DocLink'
-import { usingElectron, openInBrowser } from '../../lib/stores/electron'
-import UpgradeButton from '../UpgradeButton'
-import { useToast } from '../../../lib/v2/stores/toast'
-
-interface DocShareProps {
-  currentDoc: SerializedDocWithBookmark
-  team: SerializedTeam
-}
+import { useToast } from '../../../shared/lib/stores/toast'
+import Button, { LoadingButton } from '../../../shared/components/atoms/Button'
+import Switch from '../../../shared/components/atoms/Switch'
+import UpgradeIntroButton from '../UpgradeIntroButton'
+import { useI18n } from '../../lib/hooks/useI18n'
+import { lngKeys } from '../../lib/i18n/types'
+import { capitalize } from '../../lib/utils/string'
+import Banner from '../../../shared/components/atoms/Banner'
+import styled from '../../../shared/lib/styled'
+import FormInput from '../../../shared/components/molecules/Form/atoms/FormInput'
+import cc from 'classcat'
+import Form from '../../../shared/components/molecules/Form'
+import FormDatePicker from '../../../shared/components/molecules/Form/atoms/FormDatePicker'
+import Portal from '../../../shared/components/atoms/Portal'
 
 type SendingState =
   | 'idle'
@@ -54,12 +41,31 @@ type SendingState =
   | 'password'
   | 'expireDate'
 
+interface DocShareProps {
+  currentDoc: SerializedDocWithBookmark
+  team: SerializedTeam
+}
+
+const WrappedDocShare = ({ currentDoc, team }: DocShareProps) => {
+  const { docsMap } = useNav()
+
+  const doc = useMemo(() => {
+    return docsMap.get(currentDoc.id)
+  }, [docsMap, currentDoc.id])
+
+  if (doc == null) {
+    return <Banner variant='danger'>This document does not exist</Banner>
+  }
+
+  return <DocShare currentDoc={doc} team={team} />
+}
+
 const DocShare = ({ currentDoc, team }: DocShareProps) => {
+  const { translate } = useI18n()
   const [sending, setSending] = useState<SendingState>('idle')
   const { updateDocsMap } = useNav()
   const { setPartialPageData, subscription } = usePage()
   const { pushMessage } = useToast()
-  const [showSettings, setShowSettings] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [showExpireForm, setShowExpireForm] = useState(false)
@@ -120,7 +126,6 @@ const DocShare = ({ currentDoc, team }: DocShareProps) => {
 
       updateDocsMap([currentDoc.id, updatedDoc])
       setPartialPageData({ pageDoc: updatedDoc })
-      setShowSettings(updatedDoc.shareLink != null)
     } catch (error) {
       pushMessage({
         title: 'Error',
@@ -136,28 +141,6 @@ const DocShare = ({ currentDoc, team }: DocShareProps) => {
     pushMessage,
     updateDocsMap,
   ])
-
-  const regenerateCallback = useCallback(async () => {
-    if (currentDoc.shareLink == null || sending !== 'idle') {
-      return
-    }
-
-    setSending('regenerating')
-    try {
-      const { link } = await regenerateShareLink(currentDoc.shareLink)
-
-      const updatedDoc = { ...currentDoc, shareLink: link }
-
-      updateDocsMap([currentDoc.id, updatedDoc])
-      setPartialPageData({ pageDoc: updatedDoc })
-    } catch {
-      pushMessage({
-        title: 'Error',
-        description: 'Could not regenerate share link',
-      })
-    }
-    setSending('idle')
-  }, [currentDoc, setPartialPageData, sending, pushMessage, updateDocsMap])
 
   const togglePassword = useCallback(
     async (changedValue: boolean) => {
@@ -179,7 +162,6 @@ const DocShare = ({ currentDoc, team }: DocShareProps) => {
           const updatedDoc = { ...currentDoc, shareLink: link }
           updateDocsMap([currentDoc.id, updatedDoc])
           setPartialPageData({ pageDoc: updatedDoc })
-          setShowPasswordForm(false)
         } catch {
           pushMessage({
             title: 'Error',
@@ -188,6 +170,7 @@ const DocShare = ({ currentDoc, team }: DocShareProps) => {
         }
         setSending('idle')
       }
+      setShowPasswordForm(false)
     },
     [currentDoc, pushMessage, updateDocsMap, setPartialPageData]
   )
@@ -212,7 +195,6 @@ const DocShare = ({ currentDoc, team }: DocShareProps) => {
           const updatedDoc = { ...currentDoc, shareLink: link }
           updateDocsMap([currentDoc.id, updatedDoc])
           setPartialPageData({ pageDoc: updatedDoc })
-          setShowExpireForm(false)
         } catch {
           pushMessage({
             title: 'Error',
@@ -221,6 +203,7 @@ const DocShare = ({ currentDoc, team }: DocShareProps) => {
         }
         setSending('idle')
       }
+      setShowExpireForm(false)
     },
     [currentDoc, pushMessage, updateDocsMap, setPartialPageData]
   )
@@ -309,257 +292,166 @@ const DocShare = ({ currentDoc, team }: DocShareProps) => {
 
   const shareLink = currentDoc.shareLink
 
-  const docUrl = `${boostHubBaseUrl}${getDocLinkHref(
-    currentDoc,
-    team,
-    'index'
-  )}`
-
-  const [docUrlCopied, setDocUrlCopied] = useState(false)
-
-  const copyDocUrl = useCallback(() => {
-    copy(docUrl)
-    setDocUrlCopied(true)
-    setTimeout(() => {
-      setDocUrlCopied(false)
-    }, 600)
-  }, [docUrl])
-
-  const openNew = useCallback(() => {
-    openInBrowser(docUrl)
-  }, [docUrl])
+  const havingPro = subscription != null && subscription.plan === 'pro'
 
   return (
     <>
-      {usingElectron && (
-        <>
-          <Container className='context__column'>
-            <Flexbox className='share__row'>
-              <label className='share__row__label'>
-                <IconMdi
-                  path={mdiLinkVariant}
-                  size={18}
-                  className='context__icon'
-                />
-                URL
-              </label>
-            </Flexbox>
-            <Flexbox className='share__row'>
-              <input
-                readOnly={true}
-                className='share__link__input'
-                value={docUrl}
-                tabIndex={-1}
-              />
-              <button
-                onClick={copyDocUrl}
-                tabIndex={0}
-                className='share__link__copy'
-              >
-                <IconMdi
-                  path={
-                    docUrlCopied
-                      ? mdiClipboardCheckOutline
-                      : mdiClipboardTextOutline
-                  }
-                  size={16}
-                />
-              </button>
-              <button
-                onClick={openNew}
-                tabIndex={0}
-                className='share__link__copy'
-              >
-                <IconMdi path={mdiOpenInNew} size={16} />
-              </button>
-            </Flexbox>
-          </Container>
-          <div className='context__break' />
-        </>
-      )}
-      <Container className='context__column'>
-        <Flexbox className='share__row'>
-          <label className='share__row__label'>
-            <IconMdi path={mdiLinkPlus} size={18} className='context__icon' />
-            Public Sharing
-          </label>
-          <div className='share__row__switch'>
+      <Container className='doc__share'>
+        <div className='doc__share__row'>
+          <Icon path={mdiEarth} className='doc__share__icon' size={35} />
+          <Flexbox
+            flex='1 1 auto'
+            direction='column'
+            justifyContent='flex-start'
+            alignItems='flex-start'
+            className='doc__share__title'
+          >
+            <label className='doc__share__label'>
+              {translate(lngKeys.PublicSharing)}
+            </label>
+            <span className='doc__share__description'>
+              {translate(lngKeys.PublicSharingDisclaimer)}
+            </span>
+          </Flexbox>
+          <div className='doc__share__toggle'>
             <Switch
               disabled={sending !== 'idle'}
-              type='switch'
               id='shared-custom-switch'
               onChange={togglePublicSharing}
               checked={shareLink != null}
-              uncheckedIcon={false}
-              checkedIcon={false}
-              height={20}
-              width={45}
-              onColor='#5580DC'
             />
           </div>
-        </Flexbox>
-
+        </div>
         {shareLink != null && (
           <>
-            <Flexbox className='share__row'>
-              <input
+            <div className='doc__share__row'>
+              <FormInput
                 readOnly={true}
-                className='share__link__input'
+                className='doc__share__link'
                 value={sharedLinkHref}
-                tabIndex={-1}
               />
-              <button
+              <Button
+                variant='transparent'
                 onClick={copyButtonHandler}
                 tabIndex={0}
                 id='share__link__copy'
-              >
-                <IconMdi
-                  path={
-                    copied ? mdiClipboardCheckOutline : mdiClipboardTextOutline
-                  }
-                  size={16}
-                />
-              </button>
-            </Flexbox>
-            <button
-              className='share__row'
-              id='settings__share__link'
-              onClick={() => setShowSettings((prev) => !prev)}
+                iconPath={
+                  copied ? mdiClipboardCheckOutline : mdiClipboardTextOutline
+                }
+              />
+            </div>
+
+            <div
+              className={cc([
+                'doc__share__row doc__share__row--secondary',
+                (shareLink.password != null || showPasswordForm) &&
+                  'doc__share__row--opened',
+              ])}
             >
-              <Icon path={showSettings ? mdiChevronDown : mdiChevronRight} />{' '}
-              Sharing settings
-            </button>
-            {showSettings && (
-              <>
-                <Flexbox justifyContent='space-between' className='share__row'>
-                  <Flexbox flex='1 1 auto' wrap='wrap'>
-                    Regenerate Link
-                  </Flexbox>
-                  <button
-                    disabled={sending != 'idle'}
-                    id='regenerate__share__link'
-                    onClick={regenerateCallback}
-                  >
-                    {sending === 'regenerating' ? (
-                      <Spinner className='relative' />
-                    ) : (
-                      'Regenerate'
-                    )}
-                  </button>
-                </Flexbox>
-                <Flexbox justifyContent='space-between' className='share__row'>
-                  <Flexbox
-                    flex='1 1 auto'
-                    wrap='wrap'
-                    className='share__row__label'
-                  >
-                    <span>Password Protect</span>
-                    {(subscription == null ||
-                      subscription.plan === 'standard') && (
-                      <UpgradeButton
-                        tabIndex={-1}
-                        origin='share.password'
-                        className='upgrade__badge'
-                        query={{ teamId: team.id, docId: currentDoc.id }}
-                      />
-                    )}
-                  </Flexbox>
-                  <div className='share__row__switch'>
+              <Flexbox justifyContent='space-between'>
+                <label className='doc__share__row__label'>
+                  {capitalize(translate(lngKeys.PasswordProtect))}
+                </label>
+                {!havingPro ? (
+                  <UpgradeIntroButton
+                    variant='secondary'
+                    popupVariant='sharing-options'
+                    origin='share.password'
+                    className='upgrade__badge'
+                    query={{ teamId: team.id, docId: currentDoc.id }}
+                  />
+                ) : (
+                  <div className='doc__share__toggle'>
                     <Switch
                       disabled={subscription == null || sending !== 'idle'}
-                      type='switch'
                       id='shared-custom-switch-password'
                       onChange={togglePassword}
                       checked={shareLink.password != null || showPasswordForm}
-                      uncheckedIcon={false}
-                      checkedIcon={false}
-                      height={16}
-                      width={45}
-                      onColor='#5580DC'
                     />
                   </div>
-                </Flexbox>
-                {(shareLink.password != null || showPasswordForm) && (
-                  <form
-                    className='share__row share__form'
-                    onSubmit={onSubmitPassword}
-                  >
-                    <input
-                      id='share__link__password'
-                      value={passwordText}
-                      onChange={updatePasswordText}
-                      readOnly={sending === 'password'}
-                      placeholder='Password...'
-                    />
-                    <button type='submit'>
-                      {sending === 'password' ? (
-                        <Spinner className='relative' />
-                      ) : (
-                        'Save'
-                      )}
-                    </button>
-                  </form>
                 )}
-                <Flexbox justifyContent='space-between' className='share__row'>
-                  <Flexbox
-                    flex='1 1 auto'
-                    wrap='wrap'
-                    className='share__row__label'
+              </Flexbox>
+              {(shareLink.password != null || showPasswordForm) && (
+                <Form className='doc__share__form' onSubmit={onSubmitPassword}>
+                  <FormInput
+                    id='share__link__password'
+                    value={passwordText}
+                    onChange={updatePasswordText}
+                    autoComplete={'off'}
+                    readOnly={sending === 'password'}
+                    placeholder={translate(lngKeys.GeneralPassword)}
+                  />
+                  <LoadingButton
+                    variant='primary'
+                    spinning={sending === 'password'}
+                    disabled={sending !== 'idle'}
+                    type='submit'
                   >
-                    <span>Expiration Date</span>
-                    {(subscription == null ||
-                      subscription.plan === 'standard') && (
-                      <UpgradeButton
-                        tabIndex={-1}
-                        origin='share.expire'
-                        className='upgrade__badge'
-                        query={{ teamId: team.id, docId: currentDoc.id }}
-                      />
-                    )}
-                  </Flexbox>
-                  <div className='share__row__switch'>
+                    {capitalize(translate(lngKeys.GeneralSaveVerb))}
+                  </LoadingButton>
+                </Form>
+              )}
+            </div>
+
+            <div
+              className={cc([
+                'doc__share__row doc__share__row--secondary',
+                (shareLink.expireAt != null || showExpireForm) &&
+                  'doc__share__row--opened',
+              ])}
+            >
+              <Flexbox justifyContent='space-between'>
+                <label className='doc__share__row__label'>
+                  {capitalize(translate(lngKeys.ExpirationDate))}
+                </label>
+                {!havingPro ? (
+                  <UpgradeIntroButton
+                    variant='secondary'
+                    popupVariant='sharing-options'
+                    origin='share.expire'
+                    className='upgrade__badge'
+                    query={{ teamId: team.id, docId: currentDoc.id }}
+                  />
+                ) : (
+                  <div className='doc__share__toggle'>
                     <Switch
                       disabled={subscription == null || sending !== 'idle'}
-                      type='switch'
                       id='shared-custom-switch'
                       onChange={toggleExpire}
                       checked={shareLink.expireAt != null || showExpireForm}
-                      uncheckedIcon={false}
-                      checkedIcon={false}
-                      height={16}
-                      width={45}
-                      onColor='#5580DC'
                     />
                   </div>
-                </Flexbox>
-                {(shareLink.expireAt != null || showExpireForm) && (
-                  <form
-                    className='share__row share__form'
-                    onSubmit={onSubmitExpire}
-                  >
-                    <DatePicker
-                      id='share__link__expire'
-                      selected={expireDate}
-                      onChange={(date) => {
-                        if (!isArray(date)) {
-                          setExpireDate(date)
-                        }
-                      }}
-                      disabled={sending === 'expireDate'}
-                      minDate={new Date()}
-                      autoComplete='off'
-                    />
-                    <button type='submit'>
-                      {sending === 'expireDate' ? (
-                        <Spinner className='relative' />
-                      ) : (
-                        'Save'
-                      )}
-                    </button>
-                  </form>
                 )}
-              </>
-            )}
+              </Flexbox>
+              {(shareLink.expireAt != null || showExpireForm) && (
+                <Form className='doc__share__form' onSubmit={onSubmitExpire}>
+                  <FormDatePicker
+                    id='share__link__expire'
+                    selected={expireDate}
+                    onChange={(date) => {
+                      if (!isArray(date)) {
+                        setExpireDate(date)
+                      }
+                    }}
+                    disabled={sending === 'expireDate'}
+                    placeholderText={capitalize(
+                      translate(lngKeys.ExpirationDate)
+                    )}
+                    minDate={new Date()}
+                    autoComplete='off'
+                    popperContainer={CalendarContainer}
+                  />
+                  <LoadingButton
+                    variant='primary'
+                    spinning={sending === 'expireDate'}
+                    disabled={sending !== 'idle'}
+                    type='submit'
+                  >
+                    {capitalize(translate(lngKeys.GeneralSaveVerb))}
+                  </LoadingButton>
+                </Form>
+              )}
+            </div>
           </>
         )}
       </Container>
@@ -567,133 +459,92 @@ const DocShare = ({ currentDoc, team }: DocShareProps) => {
   )
 }
 
+const CalendarContainer = ({ children }: { children: any }) => {
+  const portalContainer = document.getElementsByClassName(
+    'modal__window__anchor'
+  )[0]!
+  return <Portal target={portalContainer}>{children}</Portal>
+}
+
 const Container = styled.div`
-  .share__form {
+  font-size: ${({ theme }) => theme.sizes.fonts.df}px;
+
+  .doc__share__form {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    margin-top: ${({ theme }) => theme.sizes.spaces.sm}px;
 
     input {
-      ${inputStyle}
-      flex: 1 1 0;
-      height: 26px;
-      padding: 0 ${({ theme }) => theme.space.xxsmall}px;
-      font-size: ${({ theme }) => theme.fontSizes.small}px;
-      width: 100%;
+      flex: 1 1 auto;
     }
 
-    button[type='submit'] {
-      ${primaryButtonStyle};
-      border-radius: 3px;
-      height: 26px;
-      line-height: initial;
-      margin-left: ${({ theme }) => theme.space.small}px;
-      font-size: ${({ theme }) => theme.fontSizes.small}px;
-      svg {
-        left: 0;
-        top: 0;
-      }
-    }
-  }
-  .share__row {
-    position: relative;
-    min-height: 30px;
-    line-height: 30px;
-    font-size: ${({ theme }) => theme.fontSizes.small}px;
-    width: 100%;
-    text-align: left;
-  }
-
-  .share__row + .share__row {
-    padding-top: ${({ theme }) => theme.space.xxsmall}px;
-    padding-bottom: ${({ theme }) => theme.space.xxsmall}px;
-  }
-
-  .share__row__label {
-    display: flex;
-    align-items: center;
-    white-space: none;
-    flex: 0 0 auto;
-    min-width: 110px;
-    margin-right: ${({ theme }) => theme.space.small}px;
-    margin-bottom: 0;
-  }
-
-  .share__row__switch {
-    line-height: initial;
-    height: fit-content;
-  }
-
-  #settings__share__link {
-    ${baseIconStyle};
-    align-items: center !important;
-    height: 30px !important;
-    background: none;
-    outline: 0;
-    font-size: ${({ theme }) => theme.fontSizes.xsmall}px !important;
-    line-height: 30px !important;
-  }
-
-  .share__link__input {
-    flex: 1 1 0;
-    ${borderedInputStyle};
-    height: 26px;
-    padding: 0 ${({ theme }) => theme.space.xxsmall}px;
-    font-size: ${({ theme }) => theme.fontSizes.small}px;
-    color: ${({ theme }) => theme.subtleTextColor};
-  }
-
-  .share__link__copy {
-    ${secondaryButtonStyle}
-    height: 26px;
-    flex: 0 0 auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 26px;
-    padding: 0;
-    text-align: center;
-    cursor: pointer;
-    &:last-child {
-      border-top-right-radius: 3px;
-      border-bottom-right-radius: 3px;
-    }
-  }
-  #share__link__copy {
-    ${secondaryButtonStyle}
-    height: 26px;
-    flex: 0 0 auto;
-    border-top-right-radius: 3px;
-    border-bottom-right-radius: 3px;
-    line-height: ${({ theme }) => theme.fontSizes.small}px;
-  }
-
-  #regenerate__share__link {
-    ${inverseSecondaryButtonStyle}
-    height: 20px;
-    font-size: ${({ theme }) => theme.fontSizes.xsmall}px;
-    line-height: ${({ theme }) => theme.fontSizes.xsmall}px;
-
-    svg {
-      left: 0;
-      top: 0;
+    button {
+      flex: 0 0 auto;
+      margin-left: ${({ theme }) => theme.sizes.spaces.df}px;
     }
   }
 
-  .react-datepicker-wrapper {
+  .react-datepicker-wrapper,
+  .react-datepicker__input-container {
     flex: 1 1 auto;
-    > div {
+  }
+
+  .react-datepicker__input-container {
+    display: flex;
+  }
+
+  .doc__share__row--secondary {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+
+    > * {
       width: 100%;
     }
   }
 
-  .upgrade__badge {
-    margin-left: ${({ theme }) => theme.space.xsmall}px;
+  .doc__share__row {
+    display: flex;
+    width: 100%;
+    align-items: center;
   }
 
-  .share__row__label span {
-    min-width: 120px;
+  .doc__share__row--secondary:not(.doc__share__row--opened)
+    + .doc__share__row--secondary {
+    margin-top: ${({ theme }) => theme.sizes.spaces.df}px;
+  }
+
+  .doc__share__link,
+  .doc__share__row__label {
+    flex: 1 1 auto;
+  }
+
+  .doc__share__row__label {
+  }
+
+  .doc__share__row + .doc__share__row {
+    margin-top: ${({ theme }) => theme.sizes.spaces.md}px;
+  }
+
+  .doc__share__icon {
+    color: ${({ theme }) => theme.colors.text.subtle};
+    flex: 0 0 auto;
+    margin-right: ${({ theme }) => theme.sizes.spaces.sm}px;
+  }
+
+  .doc__share__toggle {
+    flex: 0 0 auto;
+  }
+
+  .doc__share__label {
+    display: block;
+    font-size: ${({ theme }) => theme.sizes.fonts.md}px;
+    margin-bottom: ${({ theme }) => theme.sizes.spaces.xsm}px;
+  }
+
+  .doc__share__description {
+    font-size: ${({ theme }) => theme.sizes.fonts.sm}px;
+    color: ${({ theme }) => theme.colors.text.subtle};
   }
 `
 
-export default DocShare
+export default React.memo(WrappedDocShare)

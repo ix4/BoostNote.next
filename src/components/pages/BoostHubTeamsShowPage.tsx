@@ -1,25 +1,26 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { getBoostHubTeamPageUrl } from '../../lib/boosthub'
-import styled from '../../lib/styled'
 import { DidNavigateInPageEvent, DidNavigateEvent } from 'electron'
 import { addIpcListener, removeIpcListener } from '../../lib/electronOnly'
-import {
-  borderBottom,
-  border,
-  uiTextColor,
-  textOverflow,
-} from '../../lib/styled/styleFunctions'
 import BoostHubWebview, { WebviewControl } from '../atoms/BoostHubWebview'
 import {
-  boostHubOpenImportModalEventEmitter,
+  boostHubOpenDiscountModalEventEmitter,
   boostHubToggleSettingsEventEmitter,
   boostHubToggleSettingsMembersEventEmitter,
   boostHubToggleSidebarSearchEventEmitter,
   boostHubToggleSidebarTimelineEventEmitter,
   boostHubToggleSidebarTreeEventEmitter,
+  boostHubToggleSidebarNotificationsEventEmitter,
 } from '../../lib/events'
-import { FormSecondaryButton } from '../atoms/form'
 import { DidFailLoadEvent } from 'electron/main'
+import styled from '../../shared/lib/styled'
+import {
+  border,
+  borderBottom,
+  textOverflow,
+} from '../../shared/lib/styled/styleFunctions'
+import { uiTextColor } from '../../lib/styled/styleFunctionsLocal'
+import Button from '../../shared/components/atoms/Button'
 
 interface BoostHubTeamsShowPageProps {
   active: boolean
@@ -46,10 +47,10 @@ const BoostHubTeamsShowPage = ({
       return
     }
 
-    const toggleOpenImportModalHandler = () => {
-      webviewControlRef.current!.sendMessage('modal-import')
+    const toggleOpenDiscountModalHandler = () => {
+      webviewControlRef.current!.sendMessage('modal-discount')
     }
-    boostHubOpenImportModalEventEmitter.listen(toggleOpenImportModalHandler)
+    boostHubOpenDiscountModalEventEmitter.listen(toggleOpenDiscountModalHandler)
 
     const toggleSettingsHandler = () => {
       webviewControlRef.current!.sendMessage('toggle-settings')
@@ -72,6 +73,12 @@ const BoostHubTeamsShowPage = ({
     }
     boostHubToggleSidebarSearchEventEmitter.listen(toggleSidebarSearchHandler)
 
+    const toggleSidebarNotificationsHandler = () => {
+      webviewControlRef.current!.sendMessage('toggle-sidebar-notifications')
+    }
+    boostHubToggleSidebarNotificationsEventEmitter.listen(
+      toggleSidebarNotificationsHandler
+    )
     const toggleSettingsMembersHandler = () => {
       webviewControlRef.current!.sendMessage('toggle-settings-members')
     }
@@ -129,7 +136,9 @@ const BoostHubTeamsShowPage = ({
     addIpcListener('apply-italic-style', applyItalicStyle)
 
     return () => {
-      boostHubOpenImportModalEventEmitter.unlisten(toggleOpenImportModalHandler)
+      boostHubOpenDiscountModalEventEmitter.unlisten(
+        toggleOpenDiscountModalHandler
+      )
       boostHubToggleSettingsEventEmitter.unlisten(toggleSettingsHandler)
       boostHubToggleSettingsMembersEventEmitter.unlisten(
         toggleSettingsMembersHandler
@@ -141,6 +150,9 @@ const BoostHubTeamsShowPage = ({
         toggleSidebarTimelineHandler
       )
       boostHubToggleSidebarTreeEventEmitter.unlisten(toggleSidebarTreeHandler)
+      boostHubToggleSidebarNotificationsEventEmitter.unlisten(
+        toggleSidebarNotificationsHandler
+      )
       removeIpcListener('new-note', newNoteHandler)
       removeIpcListener('new-folder', newFolderHandler)
       removeIpcListener('save-as', saveAsHandler)
@@ -206,9 +218,9 @@ const BoostHubTeamsShowPage = ({
             <p className='description'>
               Please check your internet connection.
             </p>
-            <FormSecondaryButton onClick={reloadWebview}>
+            <Button variant={'secondary'} onClick={reloadWebview}>
               Reload Page
-            </FormSecondaryButton>
+            </Button>
           </div>
         </ReloadView>
       )}
@@ -230,12 +242,12 @@ const Container = styled.div`
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    ${borderBottom}
+    ${borderBottom};
     justify-content: center;
     .url {
       width: 100%;
       max-width: 450px;
-      ${border}
+      ${border};
       height: 24px;
       padding: 0 5px;
       border-radius: 4px;
@@ -256,14 +268,14 @@ const Container = styled.div`
       cursor: pointer;
 
       transition: color 200ms ease-in-out;
-      color: ${({ theme }) => theme.navButtonColor};
+      color: ${({ theme }) => theme.colors.text.primary};
       &:hover {
-        color: ${({ theme }) => theme.navButtonHoverColor};
+        color: ${({ theme }) => theme.colors.text.secondary};
       }
 
       &:active,
       &.active {
-        color: ${({ theme }) => theme.navButtonActiveColor};
+        color: ${({ theme }) => theme.colors.text.link};
       }
     }
   }
@@ -289,7 +301,7 @@ const ReloadView = styled.div`
   right: 0;
   bottom: 0;
   z-index: 1000;
-  background-color: ${({ theme }) => theme.backgroundColor};
+  background-color: ${({ theme }) => theme.colors.background.primary};
   display: flex;
   align-items: center;
   justify-content: center;

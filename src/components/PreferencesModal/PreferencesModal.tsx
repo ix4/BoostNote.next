@@ -1,28 +1,31 @@
 import React, { useMemo, useCallback } from 'react'
-import styled from '../../lib/styled'
 import { usePreferences } from '../../lib/preferences'
-import TabButton from './TabButton'
 import { useGlobalKeyDownHandler } from '../../lib/keyboard'
 import GeneralTab from './GeneralTab'
 import EditorTab from './EditorTab'
 import MarkdownTab from './MarkdownTab'
 import AboutTab from './AboutTab'
-import {
-  backgroundColor,
-  closeIconColor,
-  border,
-  flexCenter,
-  borderBottom,
-  borderLeft,
-} from '../../lib/styled/styleFunctions'
 import { useTranslation } from 'react-i18next'
-import Icon from '../atoms/Icon'
 import { mdiClose, mdiHammerWrench } from '@mdi/js'
 import { useDb } from '../../lib/db'
 import { useRouteParams } from '../../lib/routeParams'
 import StorageTab from './StorageTab'
 import MigrationPage from './MigrationTab'
 import { useMigrations } from '../../lib/migrate/store'
+import KeymapTab from './KeymapTab'
+import styled from '../../shared/lib/styled'
+import {
+  border,
+  backgroundColor,
+  borderBottom,
+  borderLeft,
+  closeIconColor,
+  flexCenter,
+} from '../../shared/lib/styled/styleFunctions'
+import SettingNavButtonItem from '../../shared/components/organisms/Settings/atoms/SettingNavItem'
+import Icon from '../../shared/components/atoms/Icon'
+import ExportTab from './ExportTab'
+import SponsorTab from './SponsorTab'
 
 const FullScreenContainer = styled.div`
   z-index: 7000;
@@ -47,7 +50,7 @@ const ContentContainer = styled.div`
   z-index: 7001;
   position: absolute;
   top: 0;
-  left: 40px;
+  left: 0px;
   right: 0;
   bottom: 0;
   display: flex;
@@ -58,7 +61,7 @@ const ContentContainer = styled.div`
 
 const ModalHeader = styled.div`
   height: 40px;
-  ${borderBottom}
+  ${borderBottom};
   display: flex;
 `
 
@@ -111,11 +114,11 @@ const PreferencesModal = () => {
   const currentStorage = useMemo(() => {
     let storageId: string
     switch (routeParams.name) {
-      case 'storages.notes':
-      case 'storages.tags.show':
-      case 'storages.attachments':
-      case 'storages.trashCan':
-        storageId = routeParams.storageId
+      case 'workspaces.notes':
+      case 'workspaces.labels.show':
+      case 'workspaces.attachments':
+      case 'workspaces.archive':
+        storageId = routeParams.workspaceId
         break
       default:
         return null
@@ -136,24 +139,30 @@ const PreferencesModal = () => {
 
   const content = useMemo(() => {
     switch (tab) {
+      case 'keymap':
+        return <KeymapTab />
       case 'editor':
         return <EditorTab />
       case 'markdown':
         return <MarkdownTab />
+      case 'export':
+        return <ExportTab />
       case 'about':
         return <AboutTab />
+      case 'sponsor':
+        return <SponsorTab />
       case 'storage':
         if (currentStorage != null) {
           return <StorageTab storage={currentStorage} />
         }
+        break
       case 'migration':
         if (currentStorage != null) {
           return <MigrationPage storage={currentStorage} />
         }
-      case 'general':
-      default:
-        return <GeneralTab />
+        break
     }
+    return <GeneralTab />
   }, [tab, currentStorage])
 
   if (closed) {
@@ -165,7 +174,7 @@ const PreferencesModal = () => {
       <ContentContainer>
         <ModalHeader>
           <ModalTitle>
-            <Icon size={24} path={mdiHammerWrench} />
+            <Icon size={26} path={mdiHammerWrench} />
             {t('preferences.general')}
           </ModalTitle>
           <CloseButton onClick={togglePreferencesModal}>
@@ -174,37 +183,51 @@ const PreferencesModal = () => {
         </ModalHeader>
         <ModalBody>
           <TabNav>
-            <TabButton
+            <SettingNavButtonItem
               label={t('about.about')}
-              tab='about'
               active={tab === 'about'}
-              setTab={openTab}
+              onClick={() => openTab('about')}
             />
-            <TabButton
+            <SettingNavButtonItem
+              label={t('preferences.keymap')}
+              active={tab === 'keymap'}
+              onClick={() => openTab('keymap')}
+            />
+            <SettingNavButtonItem
               label={t('general.general')}
-              tab='general'
               active={tab === 'general'}
-              setTab={openTab}
+              onClick={() => openTab('general')}
             />
             {currentStorage != null && (
-              <TabButton
+              <SettingNavButtonItem
                 label='Space'
-                tab={get(currentStorage.id) != null ? 'migration' : 'storage'}
                 active={tab === 'storage' || tab === 'migration'}
-                setTab={openTab}
+                onClick={() =>
+                  openTab(
+                    get(currentStorage.id) != null ? 'migration' : 'storage'
+                  )
+                }
               />
             )}
-            <TabButton
+            <SettingNavButtonItem
               label={t('editor.editor')}
-              tab='editor'
               active={tab === 'editor'}
-              setTab={openTab}
+              onClick={() => openTab('editor')}
             />
-            <TabButton
+            <SettingNavButtonItem
               label='Markdown'
-              tab='markdown'
               active={tab === 'markdown'}
-              setTab={openTab}
+              onClick={() => openTab('markdown')}
+            />
+            <SettingNavButtonItem
+              label='Export'
+              active={tab === 'export'}
+              onClick={() => openTab('export')}
+            />
+            <SettingNavButtonItem
+              label='Sponsor'
+              active={tab === 'sponsor'}
+              onClick={() => openTab('sponsor')}
             />
           </TabNav>
           <TabContent>{content}</TabContent>

@@ -25,6 +25,8 @@ import {
 import copy from 'copy-to-clipboard'
 import CustomButton from '../atoms/buttons/CustomButton'
 import Tooltip from '../atoms/Tooltip'
+import { useI18n } from '../../lib/hooks/useI18n'
+import { lngKeys } from '../../lib/i18n/types'
 
 interface TokenControlProps {
   token: SerializedApiToken
@@ -38,6 +40,7 @@ const TokenControl = ({ token, onUpdate, onDelete }: TokenControlProps) => {
   const [edit, setEdit] = useState(false)
   const inputRef = useRef<HTMLInputElement>()
   const [clipIcon, setClipIcon] = useState<string>(mdiContentCopy)
+  const { translate } = useI18n()
 
   const copyButtonHandler = () => {
     copy(token.token)
@@ -76,12 +79,14 @@ const TokenControl = ({ token, onUpdate, onDelete }: TokenControlProps) => {
               <SmallButton variant='transparent' onClick={() => setEdit(false)}>
                 <IconMdi path={mdiClose} size={18} />
               </SmallButton>
-              <SmallButton onClick={onSave}>Save</SmallButton>
+              <SmallButton onClick={onSave}>
+                {translate(lngKeys.GeneralSaveVerb)}
+              </SmallButton>
             </div>
           </>
         ) : (
           <>
-            <p>{name}</p>
+            <p style={{ marginTop: 0 }}>{name}</p>
             <div>
               <SmallButton variant='transparent' onClick={() => setEdit(true)}>
                 <IconMdi path={mdiPencil} size={18} />
@@ -101,10 +106,12 @@ const TokenControl = ({ token, onUpdate, onDelete }: TokenControlProps) => {
         alignItems='center'
         style={{ height: 26 }}
       >
-        <span style={{ flex: ' 0 0 auto' }}>Token:</span>
+        <span style={{ flex: ' 0 0 auto' }}>
+          {translate(lngKeys.GeneralToken)}:
+        </span>
         <Flexbox flex='1 1 auto' style={{ margin: '0 15px', height: '100%' }}>
           <StyledReadOnlyInput readOnly={true} value={displayContent} />
-          <Tooltip tooltip='copy'>
+          <Tooltip tooltip={translate(lngKeys.GeneralCopyVerb)}>
             <StyledClipboardButton
               className='copy-button'
               onClick={copyButtonHandler}
@@ -125,7 +132,9 @@ const TokenControl = ({ token, onUpdate, onDelete }: TokenControlProps) => {
             flex: '0 0 auto',
           }}
         >
-          {hide ? 'Show' : 'Hide'}
+          {hide
+            ? translate(lngKeys.GeneralShowVerb)
+            : translate(lngKeys.GeneralHideVerb)}
         </CustomButton>
       </Flexbox>
     </StyledTokenControl>

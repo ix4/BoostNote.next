@@ -21,8 +21,8 @@ import RowAction, { ContentManagerRowAction } from '../Actions/RowAction'
 import Flexbox from '../../../atoms/Flexbox'
 import { getFolderId } from '../../../../lib/utils/patterns'
 import MoveItemModal from '../../../organisms/Modal/contents/Forms/MoveItemModal'
-import { useModal } from '../../../../lib/stores/modal'
-import { useToast } from '../../../../../lib/v2/stores/toast'
+import { useToast } from '../../../../../shared/lib/stores/toast'
+import { useModal } from '../../../../../shared/lib/stores/modal'
 
 interface ContentManagerFolderRowProps {
   team: SerializedTeam
@@ -31,6 +31,7 @@ interface ContentManagerFolderRowProps {
   setUpdating: React.Dispatch<React.SetStateAction<string[]>>
   checked?: boolean
   onSelect: (val: boolean) => void
+  currentUserIsCoreMember: boolean
 }
 
 enum ActionsIds {
@@ -44,6 +45,7 @@ const ContentmanagerFolderRow = ({
   folder,
   checked,
   updating,
+  currentUserIsCoreMember,
   setUpdating,
   onSelect,
 }: ContentManagerFolderRowProps) => {
@@ -160,6 +162,10 @@ const ContentmanagerFolderRow = ({
           }
     )
 
+    if (!currentUserIsCoreMember) {
+      return actions
+    }
+
     actions.push({
       iconPath: mdiFolderMoveOutline,
       id: ActionsIds.Move,
@@ -175,12 +181,19 @@ const ContentmanagerFolderRow = ({
     })
 
     return actions
-  }, [folder, toggleFolderBookmark, trashFolder, openMoveForm])
+  }, [
+    folder,
+    toggleFolderBookmark,
+    trashFolder,
+    openMoveForm,
+    currentUserIsCoreMember,
+  ])
 
   return (
     <ContentManagerRow
       checked={checked}
       onSelect={onSelect}
+      showCheckbox={currentUserIsCoreMember}
       itemLink={
         <FolderLink folder={folder} team={team} id={`cm-folder-${folder.id}`}>
           <ContentManagerRowLinkContent

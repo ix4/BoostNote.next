@@ -1,15 +1,13 @@
 import React, { useState, useCallback, ChangeEvent } from 'react'
 import {
   FormGroup,
-  FormPrimaryButton,
-  FormSecondaryButton,
   FormBlockquote,
   FormCheckItem,
   FormLabel,
   FormTextInput,
   FormHeading,
+  FormFolderSelectorInput,
 } from '../atoms/form'
-import FormFolderSelector from '../atoms/FormFolderSelector'
 import {
   stat,
   readFile,
@@ -24,8 +22,13 @@ import { isFolderPathnameValid } from '../../lib/db/utils'
 import { useDb } from '../../lib/db'
 import { JsonObject } from 'type-fest'
 import { filenamify } from '../../lib/string'
-import Icon from '../atoms/Icon'
 import { mdiChevronDown, mdiChevronRight } from '@mdi/js'
+import Form from '../../shared/components/molecules/Form'
+import { openDialog } from '../../lib/exports'
+import { useTranslation } from 'react-i18next'
+import Icon from '../../shared/components/atoms/Icon'
+import { useToast } from '../../shared/lib/stores/toast'
+import Button from '../../shared/components/atoms/Button'
 
 interface ImportLegacyNotesFormProps {
   storageId: string
@@ -33,6 +36,8 @@ interface ImportLegacyNotesFormProps {
 
 const ImportLegacyNotesForm = ({ storageId }: ImportLegacyNotesFormProps) => {
   const { addAttachments, createFolder, createNote, initialize } = useDb()
+  const { t } = useTranslation()
+  const { pushMessage } = useToast()
 
   const [location, setLocation] = useState('')
   const [opened, setOpened] = useState(false)
@@ -212,7 +217,12 @@ const ImportLegacyNotesForm = ({ storageId }: ImportLegacyNotesFormProps) => {
         await createFolder(
           storageId,
           join(destinationFolderPathname, folderName)
-        )
+        ).catch((err) => {
+          pushMessage({
+            title: 'Error',
+            description: `Cannot create folder, reason: ${err}`,
+          })
+        })
       }
 
       for (const note of convertedNotes) {
@@ -238,15 +248,16 @@ const ImportLegacyNotesForm = ({ storageId }: ImportLegacyNotesFormProps) => {
     }
     setImporting(false)
   }, [
+    importing,
     destinationFolderPathname,
     location,
-    convertingSnippetNotes,
-    storageId,
-    addAttachments,
-    createFolder,
-    createNote,
-    importing,
     initialize,
+    addAttachments,
+    storageId,
+    convertingSnippetNotes,
+    createFolder,
+    pushMessage,
+    createNote,
   ])
 
   const updateConvertingSnippetNotes = useCallback(
@@ -262,6 +273,11 @@ const ImportLegacyNotesForm = ({ storageId }: ImportLegacyNotesFormProps) => {
     },
     []
   )
+
+  const openDialogAndStoreLocation = useCallback(async () => {
+    const location = await openDialog()
+    setLocation(location)
+  }, [setLocation])
 
   return (
     <>
@@ -289,10 +305,38 @@ const ImportLegacyNotesForm = ({ storageId }: ImportLegacyNotesFormProps) => {
           {errorMessage != null && (
             <FormBlockquote variant='danger'>{errorMessage}</FormBlockquote>
           )}
-          <FormGroup>
-            <FormLabel>Legacy Storage Location</FormLabel>
-            <FormFolderSelector value={location} setValue={setLocation} />
-          </FormGroup>
+          <Form
+            rows={[
+              {
+                title: 'Legacy Storage Location',
+                items: [
+                  {
+                    type: 'node',
+                    element: (
+                      <FormFolderSelectorInput
+                        type='text'
+                        onClick={openDialogAndStoreLocation}
+                        readOnly
+                        value={
+                          location.trim().length === 0
+                            ? t('folder.noLocationSelected')
+                            : location
+                        }
+                      />
+                    ),
+                  },
+                  {
+                    type: 'button',
+                    props: {
+                      label: 'Select Folder',
+                      variant: 'primary',
+                      onClick: openDialogAndStoreLocation,
+                    },
+                  },
+                ],
+              },
+            ]}
+          />
           <FormGroup>
             <FormLabel>Destination Folder</FormLabel>
             <FormTextInput
@@ -311,10 +355,12 @@ const ImportLegacyNotesForm = ({ storageId }: ImportLegacyNotesFormProps) => {
             </FormCheckItem>
           </FormGroup>
           <FormGroup>
-            <FormPrimaryButton onClick={importNotes}>Import</FormPrimaryButton>
-            <FormSecondaryButton onClick={closeForm}>
+            <Button variant={'primary'} onClick={importNotes}>
+              Import
+            </Button>
+            <Button variant={'secondary'} onClick={closeForm}>
               Cancel
-            </FormSecondaryButton>
+            </Button>
           </FormGroup>
         </>
       ) : (
